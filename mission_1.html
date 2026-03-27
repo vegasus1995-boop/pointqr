@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COPAY Services — Mission Extérieure</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#c8861a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="COPAY Mission">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0a0a0f;
+      --card:#13131a;
+      --accent:#c8861a;
+      --text:#e8e8f0;
+      --muted:#666;
+      --border:#1e1e2e;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;}
+    .logo-wrap{text-align:center;margin-bottom:2rem;}
+    .logo-wrap img{height:70px;border-radius:10px;margin-bottom:0.8rem;}
+    .logo-wrap h1{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:#fff;}
+    .logo-wrap h1 span{color:var(--accent);}
+    .logo-wrap p{color:var(--muted);font-size:0.82rem;margin-top:0.3rem;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;width:100%;max-width:400px;}
+    .card h2{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:1.5rem;text-align:center;text-transform:uppercase;letter-spacing:0.05em;}
+    label{display:block;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem;}
+    input,textarea{width:100%;padding:0.85rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.95rem;margin-bottom:1.2rem;outline:none;transition:border 0.2s;}
+    input:focus,textarea:focus{border-color:var(--accent);}
+    textarea{resize:none;height:80px;}
+    .btn{width:100%;padding:1rem;background:var(--accent);color:#0a0a0f;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-size:1rem;font-weight:800;cursor:pointer;letter-spacing:0.05em;transition:opacity 0.2s;}
+    .btn:disabled{opacity:0.5;cursor:not-allowed;}
+    .btn:hover:not(:disabled){opacity:0.85;}
+    .msg{margin-top:1.2rem;padding:1rem;border-radius:10px;font-size:0.85rem;text-align:center;display:none;}
+    .msg.success{background:#c8861a20;border:1px solid var(--accent);color:var(--accent);}
+    .msg.error{background:#ff444420;border:1px solid #ff4444;color:#ff4444;}
+    .emp-info{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.8rem;margin-bottom:1.2rem;display:none;}
+    .emp-info .ename{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:#fff;}
+    .emp-info .epost{font-size:0.78rem;color:var(--muted);}
+    .status-badge{display:inline-block;padding:0.2rem 0.6rem;border-radius:20px;font-size:0.72rem;font-weight:700;margin-top:0.3rem;}
+    .mission-badge{background:#c8861a30;color:#c8861a;border:1px solid #c8861a50;}
+    #qr-reader{border-radius:12px;overflow:hidden;margin-bottom:1rem;}
+    #qr-reader video{border-radius:12px;}
+    .or-divider{text-align:center;color:var(--muted);font-size:0.8rem;margin:1rem 0;position:relative;}
+    .or-divider::before,.or-divider::after{content:"";position:absolute;top:50%;width:40%;height:1px;background:var(--border);}
+    .or-divider::before{left:0;}
+    .or-divider::after{right:0;}
+    .btn-scan{width:100%;padding:0.85rem;background:var(--border);color:var(--text);border:1px solid var(--accent);border-radius:10px;font-family:"Syne",sans-serif;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:1rem;transition:all 0.2s;}
+    .btn-scan:hover{background:var(--accent);color:#0a0a0f;}
+    .footer{margin-top:2rem;text-align:center;color:var(--muted);font-size:0.75rem;}
+  </style>
+</head>
+<body>
+
+<div class="logo-wrap">
+  <img src="logo.jpg" alt="COPAY Services">
+  <h1>COPAY <span>Services</span></h1>
+  <p>Déclaration de mission extérieure</p>
+</div>
+
+<div class="card">
+  <h2>🚛 Partir en mission</h2>
+
+  <!-- SCANNER QR -->
+  <button class="btn-scan" id="btnStartScan" onclick="startScan()">📷 Scanner mon badge QR</button>
+  <div id="qr-reader" style="display:none;"></div>
+  <div id="scan-status" style="font-size:0.78rem;color:var(--muted);text-align:center;margin-bottom:0.5rem;display:none;">Pointez la caméra vers votre badge QR</div>
+
+  <div class="or-divider">ou</div>
+
+  <label>Entrez votre numéro d'employé</label>
+  <input type="text" id="empNum" placeholder="Ex: EMP5DYTQ" oninput="this.value=this.value.toUpperCase()" onblur="checkEmp()">
+
+  <div class="emp-info" id="empInfo">
+    <div class="ename" id="empName">—</div>
+    <div class="epost" id="empPost">—</div>
+    <span class="status-badge mission-badge">🟠 Sera EN MISSION</span>
+  </div>
+
+  <label>Destination</label>
+  <input type="text" id="destination" placeholder="Ex: Kpalimé, Atakpamé...">
+
+  <label>Note (facultatif)</label>
+  <textarea id="note" placeholder="Ex: Livraison de gaz, retour prévu demain..."></textarea>
+
+  <button class="btn" id="btnMission" onclick="declarerMission()">🚛 Déclarer ma mission</button>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<div class="footer">COPAY Services — Système de Pointage PointQR</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDocs, addDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBS5p-6BtA5VCAXiGMHpC9EM1yaiwtN2TE",
+  authDomain: "pointage-d224b.firebaseapp.com",
+  projectId: "pointage-d224b",
+  storageBucket: "pointage-d224b.firebasestorage.app",
+  messagingSenderId: "1058565852224",
+  appId: "1:1058565852224:web:2d47ee1405f1a1828d63a5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+let foundEmp = null;
+
+window.checkEmp = async function(){
+  const num = document.getElementById('empNum').value.trim().toUpperCase();
+  if(!num) return;
+  
+  const snap = await getDocs(collection(db,'employees'));
+  foundEmp = null;
+  snap.forEach(d => {
+    const data = d.data();
+    if(data.id === num || d.id === num) foundEmp = {...data, docId: d.id};
+  });
+
+  const info = document.getElementById('empInfo');
+  if(foundEmp){
+    document.getElementById('empName').textContent = foundEmp.nom || '—';
+    document.getElementById('empPost').textContent = foundEmp.poste || '—';
+    info.style.display = 'block';
+  } else {
+    info.style.display = 'none';
+  }
+};
+
+let html5QrCode = null;
+
+window.startScan = function(){
+  const btn = document.getElementById('btnStartScan');
+  const reader = document.getElementById('qr-reader');
+  const status = document.getElementById('scan-status');
+  
+  if(html5QrCode){
+    html5QrCode.stop().catch(()=>{});
+    html5QrCode = null;
+    reader.style.display = 'none';
+    status.style.display = 'none';
+    btn.textContent = '📷 Scanner mon badge QR';
+    return;
+  }
+
+  reader.style.display = 'block';
+  status.style.display = 'block';
+  btn.textContent = '⏹ Arrêter le scanner';
+
+  html5QrCode = new Html5Qrcode("qr-reader");
+  html5QrCode.start(
+    {facingMode: "environment"},
+    {fps:10, qrbox:{width:220,height:220}},
+    async (decodedText) => {
+      // QR scanné !
+      document.getElementById('empNum').value = decodedText.toUpperCase();
+      html5QrCode.stop().catch(()=>{});
+      html5QrCode = null;
+      reader.style.display = 'none';
+      status.style.display = 'none';
+      btn.textContent = '📷 Scanner mon badge QR';
+      await window.checkEmp();
+    },
+    () => {}
+  ).catch(err => {
+    reader.style.display = 'none';
+    status.style.display = 'none';
+    btn.textContent = '📷 Scanner mon badge QR';
+    showMsg('Caméra non disponible — entrez votre numéro manuellement','error');
+  });
+};
+
+window.getGPS = function(){
+  return new Promise((resolve) => {
+    if(!navigator.geolocation){ resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({lat: pos.coords.latitude, lng: pos.coords.longitude}),
+      () => resolve(null),
+      {timeout:8000, enableHighAccuracy:true}
+    );
+  });
+};
+
+window.declarerMission = async function(){
+  const num = document.getElementById('empNum').value.trim().toUpperCase();
+  const dest = document.getElementById('destination').value.trim();
+  const note = document.getElementById('note').value.trim();
+  const btn = document.getElementById('btnMission');
+  const msg = document.getElementById('msg');
+
+  if(!num){ showMsg('Entrez votre numéro d\'employé !','error'); return; }
+  if(!foundEmp){ showMsg('Numéro d\'employé introuvable !','error'); return; }
+  if(!dest){ showMsg('Entrez votre destination !','error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '📍 Récupération GPS...';
+
+  // Récupérer position GPS
+  const gps = await window.getGPS();
+
+  try {
+    const now = new Date();
+    await addDoc(collection(db,'logs'),{
+      empId: foundEmp.docId || num,
+      empNom: foundEmp.nom,
+      type: 'arrivee',
+      mission: true,
+      destination: dest,
+      note: note,
+      ville: dest,
+      timestamp: now.toISOString(),
+      lat: gps ? gps.lat : null,
+      lng: gps ? gps.lng : null,
+      date: now.toLocaleDateString('fr-FR'),
+      heure: now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+    });
+
+    
+    btn.textContent = '✅ Mission déclarée !';
+    if(gps) showMsg(`✅ Mission déclarée ! ${foundEmp.nom} est EN MISSION vers ${dest} 📍 Position GPS capturée`,'success');
+    else showMsg(`✅ Mission déclarée ! ${foundEmp.nom} est EN MISSION vers ${dest} (GPS non disponible)`,'success');
+    document.getElementById('destination').value = '';
+    document.getElementById('note').value = '';
+  } catch(e) {
+    console.error(e);
+    showMsg('Erreur ! Réessayez.','error');
+    btn.disabled = false;
+    btn.textContent = '🚛 Déclarer ma mission';
+  }
+};
+
+function showMsg(text, type){
+  const msg = document.getElementById('msg');
+  msg.textContent = text;
+  msg.className = 'msg ' + type;
+  msg.style.display = 'block';
+}
+</script>
+</body>
+</html>
