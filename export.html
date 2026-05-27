@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COPAY Services — Export Pointage</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#c8861a">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root{--bg:#0a0a0f;--card:#13131a;--accent:#c8861a;--text:#e8e8f0;--muted:#666;--border:#1e1e2e;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;padding:1.5rem;}
+    header{display:flex;align-items:center;gap:1rem;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid var(--border);}
+    header img{height:45px;border-radius:8px;}
+    header h1{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:#fff;}
+    header h1 span{color:var(--accent);}
+    header small{color:var(--muted);font-size:0.8rem;display:block;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;margin-bottom:2rem;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.5rem;}
+    .card h2{font-family:'Syne',sans-serif;font-size:0.9rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem;}
+    label{display:block;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.4rem;margin-top:0.8rem;}
+    select,input{width:100%;padding:0.7rem 0.9rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:0.88rem;outline:none;}
+    select:focus,input:focus{border-color:var(--accent);}
+    .btn{width:100%;padding:0.9rem;background:var(--accent);color:#0a0a0f;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:800;cursor:pointer;margin-top:1rem;transition:opacity 0.2s;}
+    .btn:disabled{opacity:0.4;cursor:not-allowed;}
+    .btn:hover:not(:disabled){opacity:0.85;}
+    .btn-outline{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.8rem;margin-top:0.5rem;}
+    .stat{background:var(--bg);border-radius:10px;padding:0.8rem;text-align:center;border:1px solid var(--border);}
+    .stat-num{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent);}
+    .stat-lbl{font-size:0.72rem;color:var(--muted);margin-top:0.2rem;}
+    .preview-table{width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:1rem;}
+    .preview-table th{background:#1e1e2e;color:var(--accent);padding:0.5rem;text-align:left;font-size:0.72rem;text-transform:uppercase;}
+    .preview-table td{padding:0.45rem 0.5rem;border-bottom:1px solid var(--border);}
+    .preview-table tr:hover td{background:#1a1a24;}
+    .badge{display:inline-block;padding:0.15rem 0.5rem;border-radius:20px;font-size:0.7rem;font-weight:700;}
+    .badge-p{background:#c8861a30;color:#c8861a;}
+    .badge-m{background:#3498db30;color:#3498db;}
+    .badge-a{background:#e74c3c30;color:#e74c3c;}
+    .badge-sodi{background:#1E563130;color:#2ecc71;}
+    .badge-total{background:#1F4E7930;color:#3498db;}
+    .loading{text-align:center;color:var(--muted);padding:2rem;font-size:0.85rem;}
+    .msg{padding:0.8rem 1rem;border-radius:8px;font-size:0.85rem;margin-top:1rem;display:none;}
+    .msg.success{background:#c8861a20;border:1px solid var(--accent);color:var(--accent);}
+    .msg.error{background:#e74c3c20;border:1px solid #e74c3c;color:#e74c3c;}
+    .progress{background:var(--border);border-radius:10px;height:6px;margin-top:1rem;display:none;}
+    .progress-bar{height:100%;background:var(--accent);border-radius:10px;transition:width 0.3s;width:0%;}
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="logo.jpg" alt="COPAY">
+  <div>
+    <h1>COPAY <span>Services</span></h1>
+    <small>Export Feuille de Pointage</small>
+  </div>
+  <div style="margin-left:auto;">
+    <a href="dashboard.html" style="color:var(--muted);font-size:0.8rem;text-decoration:none;">← Dashboard</a>
+  </div>
+</header>
+
+<div class="grid">
+  <!-- Paramètres -->
+  <div class="card">
+    <h2>⚙️ Paramètres d'export</h2>
+    
+    <label>Période (début — toujours le 16)</label>
+    <select id="mois_debut">
+      <option value="1">Janvier</option><option value="2">Février</option>
+      <option value="3">Mars</option><option value="4">Avril</option>
+      <option value="5">Mai</option><option value="6">Juin</option>
+      <option value="7">Juillet</option><option value="8">Août</option>
+      <option value="9">Septembre</option><option value="10">Octobre</option>
+      <option value="11">Novembre</option><option value="12">Décembre</option>
+    </select>
+    
+    <label>Année</label>
+    <input type="number" id="annee" value="2026" min="2024" max="2030">
+    
+    <label>Filtrer par société</label>
+    <select id="filtre_soc">
+      <option value="tous">Toutes (Sodigaz + Total)</option>
+      <option value="Sodigaz">Sodigaz uniquement</option>
+      <option value="Total">Total uniquement</option>
+    </select>
+
+    <button class="btn" id="btnCharger" onclick="chargerDonnees()">📊 Charger les données</button>
+    <div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="card">
+    <h2>📈 Aperçu de la période</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-num" id="stat_presents">—</div><div class="stat-lbl">Présences</div></div>
+      <div class="stat"><div class="stat-num" id="stat_missions">—</div><div class="stat-lbl">Missions</div></div>
+      <div class="stat"><div class="stat-num" id="stat_primes">—</div><div class="stat-lbl">Primes (F)</div></div>
+    </div>
+    <div class="stat-grid" style="margin-top:0.8rem;">
+      <div class="stat"><div class="stat-num" id="stat_sodigaz">—</div><div class="stat-lbl">Sodigaz</div></div>
+      <div class="stat"><div class="stat-num" id="stat_total_emp">—</div><div class="stat-lbl">Total</div></div>
+      <div class="stat"><div class="stat-num" id="stat_jours">—</div><div class="stat-lbl">Jours période</div></div>
+    </div>
+    <button class="btn btn-outline" id="btnExport" onclick="exporterExcel()" disabled style="margin-top:1.5rem;">
+      ⬇️ Télécharger Excel
+    </button>
+  </div>
+</div>
+
+<!-- Aperçu données -->
+<div class="card">
+  <h2>👁️ Aperçu des pointages</h2>
+  <div id="preview-container"><div class="loading">Chargez les données pour voir l'aperçu...</div></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBS5p-6BtA5VCAXiGMHpC9EM1yaiwtN2TE",
+  authDomain: "pointage-d224b.firebaseapp.com",
+  projectId: "pointage-d224b",
+  storageBucket: "pointage-d224b.firebasestorage.app",
+  messagingSenderId: "1058565852224",
+  appId: "1:1058565852224:web:2d47ee1405f1a1828d63a5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let allEmployees = [];
+let allLogs = [];
+let pointageData = {};
+
+// Barème
+function calcPrime(nb) {
+  if(nb <= 0) return 0;
+  if(nb <= 2) return 500;
+  if(nb == 3) return 1000;
+  if(nb <= 5) return 1500;
+  if(nb == 6) return 2000;
+  if(nb <= 8) return 2500;
+  if(nb == 9) return 3000;
+  if(nb <= 11) return 3500;
+  if(nb == 12) return 4000;
+  if(nb <= 14) return 4500;
+  if(nb == 15) return 5000;
+  if(nb <= 17) return 5500;
+  if(nb == 18) return 6000;
+  if(nb <= 20) return 6500;
+  if(nb == 21) return 7000;
+  if(nb <= 23) return 7500;
+  return 8000;
+}
+
+function setProgress(pct) {
+  document.getElementById('progress').style.display = 'block';
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+
+function showMsg(txt, type) {
+  const m = document.getElementById('msg');
+  m.textContent = txt;
+  m.className = 'msg ' + type;
+  m.style.display = 'block';
+}
+
+window.chargerDonnees = async function() {
+  const mois = parseInt(document.getElementById('mois_debut').value);
+  const annee = parseInt(document.getElementById('annee').value);
+  const filtre = document.getElementById('filtre_soc').value;
+  const btn = document.getElementById('btnCharger');
+  
+  btn.disabled = true;
+  btn.textContent = '⏳ Chargement...';
+  setProgress(10);
+  document.getElementById('preview-container').innerHTML = '<div class="loading">Chargement en cours...</div>';
+
+  try {
+    // Calculer la période: 16 du mois → 15 du mois suivant
+    const debut = new Date(annee, mois - 1, 16);
+    const mois_fin = mois == 12 ? 1 : mois + 1;
+    const annee_fin = mois == 12 ? annee + 1 : annee;
+    const fin = new Date(annee_fin, mois_fin - 1, 15, 23, 59, 59);
+
+    setProgress(30);
+
+    // Charger employés
+    const empSnap = await getDocs(collection(db, 'employees'));
+    allEmployees = [];
+    empSnap.forEach(d => allEmployees.push({docId: d.id, ...d.data()}));
+    
+    setProgress(50);
+
+    // Charger logs
+    const logsSnap = await getDocs(collection(db, 'logs'));
+    allLogs = [];
+    logsSnap.forEach(d => allLogs.push({docId: d.id, ...d.data()}));
+
+    setProgress(70);
+
+    // Filtrer logs par période
+    const logsFiltered = allLogs.filter(l => {
+      const d = new Date(l.timestamp || l.date);
+      return d >= debut && d <= fin;
+    });
+
+    // Construire données pointage par employé par jour
+    pointageData = {};
+    
+    // Générer liste des jours de la période (16 → 15)
+    const jours = [];
+    let current = new Date(debut);
+    while(current <= fin) {
+      jours.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Pour chaque employé
+    for(const emp of allEmployees) {
+      const empLogs = logsFiltered.filter(l => 
+        l.empId === emp.id || l.empId === emp.docId
+      );
+      
+      pointageData[emp.docId] = {
+        emp,
+        jours: {},
+        total_presents: 0,
+        total_missions: 0,
+        prime: 0
+      };
+
+      for(const jour of jours) {
+        const jourStr = jour.toLocaleDateString('fr-FR');
+        const dayLogs = empLogs.filter(l => {
+          const d = new Date(l.timestamp || l.date);
+          return d.toLocaleDateString('fr-FR') === jourStr;
+        });
+        
+        // Déterminer statut du jour
+        let statut = 'A';
+        if(dayLogs.some(l => l.mission)) {
+          statut = 'M';
+        } else if(dayLogs.some(l => l.type === 'arrivee')) {
+          statut = 'P';
+        }
+        
+        // Dimanche = X
+        if(jour.getDay() === 0) statut = statut === 'A' ? 'X' : statut;
+        
+        pointageData[emp.docId].jours[jourStr] = statut;
+        if(statut === 'P') pointageData[emp.docId].total_presents++;
+        if(statut === 'M') pointageData[emp.docId].total_missions++;
+      }
+      
+      pointageData[emp.docId].prime = calcPrime(pointageData[emp.docId].total_missions);
+    }
+
+    setProgress(90);
+
+    // Calculer stats
+    const empsFiltres = allEmployees.filter(e => 
+      filtre === 'tous' || e.dept === filtre || e.societe === filtre
+    );
+    
+    const totalPresents = Object.values(pointageData).reduce((s,d) => s + d.total_presents, 0);
+    const totalMissions = Object.values(pointageData).reduce((s,d) => s + d.total_missions, 0);
+    const totalPrimes = Object.values(pointageData).reduce((s,d) => s + d.prime, 0);
+    
+    document.getElementById('stat_presents').textContent = totalPresents;
+    document.getElementById('stat_missions').textContent = totalMissions;
+    document.getElementById('stat_primes').textContent = totalPrimes.toLocaleString('fr-FR');
+    document.getElementById('stat_sodigaz').textContent = allEmployees.filter(e => e.dept === 'Sodigaz' || e.societe === 'Sodigaz').length;
+    document.getElementById('stat_total_emp').textContent = allEmployees.filter(e => e.dept === 'Total' || e.societe === 'Total').length;
+    document.getElementById('stat_jours').textContent = jours.length;
+
+    // Aperçu tableau
+    let html = `<div style="overflow-x:auto;"><table class="preview-table">
+      <thead><tr>
+        <th>Nom</th><th>Société</th><th>Présents</th><th>Missions</th><th>Prime (F)</th>
+      </tr></thead><tbody>`;
+    
+    for(const emp of allEmployees.slice(0, 20)) {
+      const d = pointageData[emp.docId];
+      if(!d) continue;
+      const soc = emp.dept || emp.societe || '—';
+      html += `<tr>
+        <td><b>${emp.nom}</b></td>
+        <td><span class="badge ${soc==='Sodigaz'?'badge-sodi':'badge-total'}">${soc}</span></td>
+        <td><span class="badge badge-p">${d.total_presents} P</span></td>
+        <td><span class="badge badge-m">${d.total_missions} M</span></td>
+        <td><b>${d.prime.toLocaleString('fr-FR')} F</b></td>
+      </tr>`;
+    }
+    
+    html += '</tbody></table></div>';
+    if(allEmployees.length > 20) html += `<div style="color:var(--muted);font-size:0.78rem;padding:0.5rem;">... et ${allEmployees.length - 20} autres employés dans le fichier Excel</div>`;
+    
+    document.getElementById('preview-container').innerHTML = html;
+    document.getElementById('btnExport').disabled = false;
+    setProgress(100);
+    showMsg(`✅ ${allEmployees.length} employés chargés — ${logsFiltered.length} pointages trouvés`, 'success');
+    
+    // Stocker période pour export
+    window._periode = { debut, fin, jours, mois, annee, mois_fin, annee_fin };
+    
+  } catch(e) {
+    console.error(e);
+    showMsg('Erreur de chargement : ' + e.message, 'error');
+  }
+  
+  btn.disabled = false;
+  btn.textContent = '📊 Charger les données';
+};
+
+window.exporterExcel = function() {
+  if(!window._periode) return;
+  const { debut, fin, jours, mois, annee, mois_fin, annee_fin } = window._periode;
+  const filtre = document.getElementById('filtre_soc').value;
+  
+  const moisNoms = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const periodeTitre = `16 ${moisNoms[mois-1]} ${annee} AU 15 ${moisNoms[mois_fin-1]} ${annee_fin}`;
+  
+  const wb = XLSX.utils.book_new();
+  
+  // Groupes
+  const groupes = [
+    { nom: 'Sodigaz', couleur: 'c8e6c9' },
+    { nom: 'Total', couleur: 'bbdefb' }
+  ];
+  
+  for(const groupe of groupes) {
+    if(filtre !== 'tous' && filtre !== groupe.nom) continue;
+    
+    const emps = allEmployees.filter(e => e.dept === groupe.nom || e.societe === groupe.nom);
+    if(emps.length === 0) continue;
+    
+    const wsData = [];
+    
+    // Titre
+    wsData.push([`COPAY SERVICES — FEUILLE DE POINTAGE (${groupe.nom.toUpperCase()})`]);
+    wsData.push([`Période : du 16 du mois au 15 du mois suivant          Mois : ${periodeTitre}`]);
+    wsData.push(['BARÈME : ≤2→500 F | 3→1000 F | 4-5→1500 F | 6→2000 F | 7-8→2500 F | 9→3000 F | 10-11→3500 F | 12→4000 F | 13-14→4500 F | 15→5000 F | 16-17→5500 F | 18→6000 F | 19-20→6500 F | 21→7000 F | 22-23→7500 F | 24→8000 F']);
+    
+    // En-têtes
+    const headerRow = ['N°', 'Plaque Voiture', 'Noms & Prénoms'];
+    for(const jour of jours) {
+      headerRow.push(jour.getDate().toString());
+    }
+    headerRow.push('Total Jours', 'Nb Miss.', 'Prime (F CFA)', 'Observations');
+    wsData.push(headerRow);
+    
+    // Données
+    let num = 1;
+    let totPresents = 0, totMissions = 0, totPrimes = 0;
+    
+    for(const emp of emps) {
+      const d = pointageData[emp.docId];
+      const row = [num++, emp.plaque || '', emp.nom];
+      
+      for(const jour of jours) {
+        const jourStr = jour.toLocaleDateString('fr-FR');
+        row.push(d ? (d.jours[jourStr] || 'A') : 'A');
+      }
+      
+      const presents = d ? d.total_presents : 0;
+      const missions = d ? d.total_missions : 0;
+      const prime = d ? d.prime : 0;
+      
+      row.push(presents + missions, missions, prime, '');
+      wsData.push(row);
+      
+      totPresents += presents;
+      totMissions += missions;
+      totPrimes += prime;
+    }
+    
+    // Totaux
+    const totRow = ['TOTAUX', '', ''];
+    for(const jour of jours) totRow.push('');
+    totRow.push(totPresents + totMissions, totMissions, totPrimes, '');
+    wsData.push(totRow);
+    
+    // Légende
+    wsData.push([]);
+    wsData.push(['LÉGENDE :  P = Présent   M = Mission   A = Absent   C = Congé   X = Dimanche/Repos']);
+    wsData.push(['Signature responsable : ________________________________']);
+    
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Largeurs colonnes
+    const colWidths = [{wch:5}, {wch:14}, {wch:22}];
+    for(const j of jours) colWidths.push({wch:4});
+    colWidths.push({wch:10},{wch:8},{wch:12},{wch:18});
+    ws['!cols'] = colWidths;
+    
+    XLSX.utils.book_append_sheet(wb, ws, groupe.nom);
+  }
+  
+  // Feuille Récap
+  const recapData = [];
+  recapData.push(['COPAY SERVICES — RÉCAPITULATIF MENSUEL (16 → 15)']);
+  recapData.push([`Mois : ${periodeTitre}`]);
+  recapData.push([]);
+  recapData.push(['N°', 'Société', 'Plaque', 'Noms & Prénoms', 'Total Missions', 'Prime Totale (F)', 'Observations']);
+  
+  let num = 1;
+  for(const emp of allEmployees) {
+    if(filtre !== 'tous' && emp.dept !== filtre && emp.societe !== filtre) continue;
+    const d = pointageData[emp.docId];
+    const soc = emp.dept || emp.societe || '—';
+    recapData.push([
+      num++, soc, emp.plaque || '', emp.nom,
+      d ? d.total_missions : 0,
+      d ? d.prime : 0,
+      ''
+    ]);
+  }
+  
+  const wsRecap = XLSX.utils.aoa_to_sheet(recapData);
+  wsRecap['!cols'] = [{wch:5},{wch:12},{wch:14},{wch:22},{wch:14},{wch:16},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, wsRecap, 'Récap Mensuel');
+  
+  // Télécharger
+  const filename = `COPAY_Pointage_${periodeTitre.replace(/ /g,'_')}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  showMsg(`✅ Fichier "${filename}" téléchargé !`, 'success');
+};
+</script>
+</body>
+</html>
