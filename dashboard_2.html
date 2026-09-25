@@ -445,6 +445,35 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
 </main>
 
 <!-- MODALS -->
+<!-- MODAL MODIFICATION EMPLOYÉ -->
+<div class="modal-ov" id="editmod">
+  <div class="modal">
+    <button class="mcls" onclick="closeMod('editmod')">✕</button>
+    <div class="mtitle">✏️ Modifier l'employé</div>
+    <div class="msub" id="edit-sub">—</div>
+    <input type="hidden" id="edit-id">
+    <div class="fgrid" style="margin-bottom:1rem;">
+      <div class="fg" style="grid-column:1/-1;">
+        <label>Photo</label>
+        <div class="pup"><input type="file" id="edit-ph" accept="image/*" onchange="prevEditPhoto(this)">
+          <img id="edit-ph-prev" class="pprev" style="display:none;">
+          <div id="edit-ph-ph"><div style="font-size:1.5rem;">📷</div><div style="font-size:.7rem;color:var(--muted);">Changer la photo</div></div>
+        </div>
+      </div>
+      <div class="fg"><label>Prénom & Nom</label><input id="edit-nom" type="text"></div>
+      <div class="fg"><label>Poste</label><input id="edit-poste" type="text"></div>
+      <div class="fg"><label>Société</label><input id="edit-dept" type="text"></div>
+      <div class="fg"><label>Téléphone</label><input id="edit-tel" type="tel"></div>
+      <div class="fg"><label>🪪 Numéro de carte</label><input id="edit-carte" type="text"></div>
+      <div class="fg"><label>🚗 Plaque voiture</label><input id="edit-plaque" type="text"></div>
+    </div>
+    <div style="display:flex;gap:.75rem;">
+      <button class="btn btn-p" id="edit-save-btn" onclick="saveEdit()" style="flex:1;">💾 Enregistrer</button>
+      <button class="btn btn-s" onclick="closeMod('editmod')">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-ov" id="qrmod">
   <div class="modal">
     <button class="mcls" onclick="closeMod('qrmod')">✕</button>
@@ -721,6 +750,60 @@ async function addEmp(){
   toast('Employé ajouté ✓',nom);
 }
 
+// ── MODIFIER EMPLOYÉ ──────────────────────────────────────────────
+let editPhoto=null;
+
+function openEdit(empId){
+  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  document.getElementById('edit-id').value=emp.id;
+  document.getElementById('edit-sub').textContent=`ID : ${emp.id}`;
+  document.getElementById('edit-nom').value=emp.nom||'';
+  document.getElementById('edit-poste').value=emp.poste||'';
+  document.getElementById('edit-dept').value=emp.dept||'';
+  document.getElementById('edit-tel').value=emp.tel||'';
+  document.getElementById('edit-carte').value=emp.carte||'';
+  document.getElementById('edit-plaque').value=emp.plaque||'';
+  editPhoto=null;
+  const prev=document.getElementById('edit-ph-prev');
+  if(emp.photo){prev.src=emp.photo;prev.style.display='block';document.getElementById('edit-ph-ph').style.display='none';}
+  else{prev.style.display='none';document.getElementById('edit-ph-ph').style.display='block';}
+  document.getElementById('editmod').classList.add('open');
+}
+
+function prevEditPhoto(inp){
+  const f=inp.files[0];if(!f)return;
+  const r=new FileReader();r.onload=e=>{editPhoto=e.target.result;const i=document.getElementById('edit-ph-prev');i.src=editPhoto;i.style.display='block';document.getElementById('edit-ph-ph').style.display='none';};r.readAsDataURL(f);
+}
+
+async function saveEdit(){
+  const empId=document.getElementById('edit-id').value;
+  const emp=employees.find(e=>e.id===empId);if(!emp)return;
+  const btn=document.getElementById('edit-save-btn');btn.textContent='⏳...';btn.disabled=true;
+  const{doc,setDoc}=window._fb,db=window._db;
+  let photoURL=emp.photo||null;
+  if(editPhoto){
+    try{
+      const fd=new FormData();fd.append('file',editPhoto);fd.append('upload_preset','pointqr_upload');
+      const rr=await fetch('https://api.cloudinary.com/v1_1/djmmbmqnb/image/upload',{method:'POST',body:fd});
+      const dd=await rr.json();photoURL=dd.secure_url||editPhoto;
+    }catch(e){photoURL=editPhoto;}
+  }
+  const updated={
+    ...emp,
+    nom:document.getElementById('edit-nom').value.trim(),
+    poste:document.getElementById('edit-poste').value.trim(),
+    dept:document.getElementById('edit-dept').value.trim(),
+    tel:document.getElementById('edit-tel').value.trim(),
+    carte:document.getElementById('edit-carte').value.trim(),
+    plaque:document.getElementById('edit-plaque').value.trim(),
+    photo:photoURL
+  };
+  await setDoc(doc(db,'employees',empId),updated);
+  btn.textContent='💾 Enregistrer';btn.disabled=false;
+  closeMod('editmod');
+  toast('✅ Employé modifié',updated.nom);
+}
+
 async function delEmp(id){if(!confirm('Supprimer cet employé ?'))return;const{doc,deleteDoc}=window._fb;await deleteDoc(doc(window._db,'employees',id));toast('Supprimé','','err');}
 
 function renderEmp(search=''){
@@ -734,8 +817,9 @@ function renderEmp(search=''){
     const av=emp.photo?`<div class="eavatar"><img src="${emp.photo}"></div>`:`<div class="eavatar">${ini(emp.nom)}</div>`;
     return`<div class="erow">${av}<div class="einfo"><div class="ename">${emp.nom}</div><div class="emeta">${emp.poste||''}${emp.dept?' · '+emp.dept:''}${emp.tel?' · '+emp.tel:''}</div>${emp.carte?`<span class="ecarte">🪪 ${emp.carte}</span>`:''}</div>
     <span class="eid">${emp.id}</span>${b}
-    <div style="display:flex;gap:.4rem;">
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
       <button class="btn btn-s btn-sm" onclick="showQR('${emp.id}')">📛 QR</button>
+      <button class="btn btn-sm" style="background:rgba(108,99,255,.12);color:var(--accent2);border:1px solid rgba(108,99,255,.25);" onclick="openEdit('${emp.id}')">✏️ Modifier</button>
       <button class="btn btn-d btn-sm" onclick="delEmp('${emp.id}')">✕</button>
     </div></div>`;
   }).join('');
