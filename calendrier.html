@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COPAY Services — Calendrier des présences</title>
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyBS5p-6BtA5VCAXiGMHpC9EM1yaiwtN2TE",
+  authDomain: "pointage-d224b.firebaseapp.com",
+  projectId: "pointage-d224b",
+  storageBucket: "pointage-d224b.firebasestorage.app",
+  messagingSenderId: "1058565852224",
+  appId: "1:1058565852224:web:2d47ee1405f1a1828d63a5"
+};
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+window._db=db; window._fb={collection,getDocs,query,orderBy,onAuthStateChanged,auth};
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
+:root{--bg:#07070f;--surface:#0e0e1a;--card:#141422;--border:#222238;--accent:#c8861a;--accent2:#6c63ff;--success:#00c48c;--danger:#ff4d6d;--mission:#e6a020;--text:#e8e8f5;--muted:#5a5a7a;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;}
+.loverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;transition:opacity .4s;}
+.loverlay.hide{opacity:0;pointer-events:none;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;height:60px;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;}
+.logo span{color:var(--accent);}
+.btn{padding:.45rem 1rem;border-radius:8px;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:.76rem;font-weight:500;transition:all .2s;}
+.btn-p{background:var(--accent);color:#000;font-weight:700;}
+.btn-s{background:var(--surface);color:var(--text);border:1px solid var(--border);}
+.btn-s:hover{border-color:var(--accent);color:var(--accent);}
+main{max-width:1400px;margin:0 auto;padding:1.5rem 2rem;}
+
+/* CONTROLS */
+.top-bar{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;}
+.period-nav{display:flex;align-items:center;gap:.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.45rem .75rem;}
+.period-label{font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;min-width:200px;text-align:center;}
+.nav-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:.2rem .4rem;transition:color .2s;}
+.nav-btn:hover{color:var(--accent);}
+.filter-inp{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.42rem .75rem;color:var(--text);font-family:'DM Mono',monospace;font-size:.76rem;outline:none;}
+.filter-inp:focus{border-color:var(--accent);}
+
+/* LÉGENDE */
+.legend{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.2rem;}
+.leg{display:flex;align-items:center;gap:.4rem;font-size:.7rem;color:var(--muted);}
+.leg-dot{width:14px;height:14px;border-radius:3px;flex-shrink:0;}
+
+/* STATS RAPIDES */
+.quick-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.75rem;margin-bottom:1.5rem;}
+.qs{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem;text-align:center;}
+.qsv{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;}
+.qsl{font-size:.6rem;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+
+/* TABLEAU CALENDRIER */
+.cal-wrap{overflow-x:auto;}
+.cal-table{border-collapse:collapse;width:100%;min-width:900px;}
+.cal-table th{background:var(--card);border:1px solid var(--border);padding:.45rem .3rem;font-size:.62rem;text-align:center;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;position:sticky;top:0;z-index:10;}
+.cal-table th.emp-col{min-width:160px;text-align:left;padding-left:.75rem;position:sticky;left:0;z-index:11;background:var(--card);}
+.cal-table th.dim{color:rgba(255,77,109,.5);}
+.cal-table td{border:1px solid rgba(34,34,56,.5);padding:.2rem;text-align:center;font-size:.7rem;}
+.cal-table td.emp-cell{text-align:left;padding:.4rem .75rem;background:var(--surface);position:sticky;left:0;z-index:2;border-right:2px solid var(--border);}
+.cal-table tr:hover td{background:rgba(255,255,255,.02);}
+.cal-table tr:hover td.emp-cell{background:var(--card);}
+.emp-name{font-family:'Syne',sans-serif;font-weight:600;font-size:.78rem;white-space:nowrap;}
+.emp-dept{font-size:.6rem;color:var(--muted);}
+
+/* CELLULES JOUR */
+.day-cell{width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;margin:auto;font-size:.65rem;font-weight:700;cursor:default;}
+.dc-p{background:rgba(0,196,140,.2);color:var(--success);border:1px solid rgba(0,196,140,.3);}
+.dc-m{background:rgba(230,160,32,.2);color:var(--mission);border:1px solid rgba(230,160,32,.3);}
+.dc-a{background:rgba(255,77,109,.15);color:var(--danger);border:1px solid rgba(255,77,109,.25);}
+.dc-x{background:rgba(90,90,122,.1);color:var(--muted);border:1px solid var(--border);}
+.dc-f{background:transparent;color:transparent;border:none;}
+
+/* TOTAUX */
+.tot-p{background:rgba(0,196,140,.1);color:var(--success);font-weight:700;font-size:.7rem;padding:.25rem;}
+.tot-m{background:rgba(230,160,32,.1);color:var(--mission);font-weight:700;font-size:.7rem;padding:.25rem;}
+.tot-a{background:rgba(255,77,109,.1);color:var(--danger);font-weight:700;font-size:.7rem;padding:.25rem;}
+
+@media print{
+  header,.top-bar,.legend,.quick-stats,.no-print{display:none!important;}
+  body{background:#fff!important;color:#000!important;}
+  .cal-table th{background:#f0f0f0!important;color:#333!important;}
+  .cal-table td.emp-cell{background:#f8f8f8!important;}
+}
+@media(max-width:640px){main{padding:1rem;} header{padding:0 1rem;}}
+</style>
+</head>
+<body>
+
+<div class="loverlay" id="loverlay">
+  <div class="spinner"></div>
+  <div style="font-size:.8rem;color:var(--muted);">Chargement du calendrier...</div>
+</div>
+
+<header>
+  <div class="logo">COPAY <span>Services</span> — 📅 Calendrier des présences</div>
+  <div style="display:flex;gap:.65rem;">
+    <button class="btn btn-s no-print" onclick="window.print()">🖨️ Imprimer</button>
+    <a href="dashboard_2.html" class="btn btn-s no-print">← Dashboard</a>
+  </div>
+</header>
+
+<main>
+
+  <!-- CONTROLS -->
+  <div class="top-bar">
+    <div class="period-nav">
+      <button class="nav-btn" onclick="changePeriod(-1)">◀</button>
+      <div class="period-label" id="period-label">—</div>
+      <button class="nav-btn" onclick="changePeriod(1)">▶</button>
+    </div>
+    <button class="btn btn-p no-print" onclick="goToday()">Période actuelle</button>
+    <input class="filter-inp no-print" type="text" id="emp-filter" placeholder="🔍 Filtrer un employé..." oninput="renderCal()">
+    <select class="filter-inp no-print" id="soc-filter" onchange="renderCal()">
+      <option value="">Toutes sociétés</option>
+      <option value="Total">Total</option>
+      <option value="Sodigaz">Sodigaz</option>
+    </select>
+  </div>
+
+  <!-- LÉGENDE -->
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:rgba(0,196,140,.3);border:1px solid rgba(0,196,140,.4);"></div>P — Présent bureau</div>
+    <div class="leg"><div class="leg-dot" style="background:rgba(230,160,32,.3);border:1px solid rgba(230,160,32,.4);"></div>M — Mission terrain</div>
+    <div class="leg"><div class="leg-dot" style="background:rgba(255,77,109,.2);border:1px solid rgba(255,77,109,.3);"></div>A — Absent</div>
+    <div class="leg"><div class="leg-dot" style="background:rgba(90,90,122,.15);border:1px solid var(--border);"></div>X — Dimanche</div>
+  </div>
+
+  <!-- STATS RAPIDES -->
+  <div class="quick-stats" id="quick-stats"></div>
+
+  <!-- CALENDRIER -->
+  <div class="cal-wrap">
+    <table class="cal-table" id="cal-table"></table>
+  </div>
+
+</main>
+
+<script>
+let employees=[], allLogs=[], fbOk=false;
+// Période courante : 16 du mois → 15 du mois suivant
+let periodStart = getPeriodStart(new Date());
+
+function getPeriodStart(d){
+  // Retourne le Date du 16 de la période en cours
+  const day=d.getDate();
+  if(day>=16) return new Date(d.getFullYear(),d.getMonth(),16);
+  else return new Date(d.getFullYear(),d.getMonth()-1,16);
+}
+function getPeriodEnd(start){
+  // 15 du mois suivant
+  return new Date(start.getFullYear(),start.getMonth()+1,15);
+}
+function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function frDate(d){return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();}
+function parseFr(s){const[d,m,y]=s.split('/');return new Date(+y,+m-1,+d);}
+function ini(n){return(n||'?').split(' ').map(w=>w[0]||'').join('').substring(0,2).toUpperCase();}
+
+const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const JOURS=['Di','Lu','Ma','Me','Je','Ve','Sa'];
+
+window.addEventListener('firebase-ready',()=>{
+  fbOk=true;
+  const{collection,getDocs,query,orderBy,onAuthStateChanged,auth}=window._fb,db=window._db;
+  onAuthStateChanged(auth,async user=>{
+    if(!user){window.location.href='dashboard_2.html';return;}
+    const[empSnap,logSnap]=await Promise.all([
+      getDocs(collection(db,'employees')),
+      getDocs(query(collection(db,'logs'),orderBy('ts','asc')))
+    ]);
+    employees=empSnap.docs.map(d=>({id:d.id,...d.data()}));
+    allLogs=logSnap.docs.map(d=>({_id:d.id,...d.data()}));
+    document.getElementById('loverlay').classList.add('hide');
+    renderCal();
+  });
+});
+
+function changePeriod(dir){
+  // Avancer/reculer d'un mois
+  periodStart=new Date(periodStart.getFullYear(),periodStart.getMonth()+dir,16);
+  renderCal();
+}
+function goToday(){periodStart=getPeriodStart(new Date());renderCal();}
+
+function renderCal(){
+  const periodEnd=getPeriodEnd(periodStart);
+  const empFilter=document.getElementById('emp-filter').value.toLowerCase().trim();
+  const socFilter=document.getElementById('soc-filter').value;
+
+  // Label période
+  const startM=MOIS[periodStart.getMonth()],startY=periodStart.getFullYear();
+  const endM=MOIS[periodEnd.getMonth()],endY=periodEnd.getFullYear();
+  document.getElementById('period-label').textContent=`16 ${startM} → 15 ${endM} ${endY}`;
+
+  // Dates de la période
+  const dates=[];
+  for(let d=new Date(periodStart);d<=periodEnd;d.setDate(d.getDate()+1))dates.push(new Date(d));
+
+  // Filtrer logs dans la période
+  const filtered=allLogs.filter(l=>{
+    try{const d=parseFr(l.date);return d>=periodStart&&d<=periodEnd;}catch{return false;}
+  });
+
+  // Filtrer employés
+  let empList=employees;
+  if(empFilter)empList=empList.filter(e=>(e.nom||'').toLowerCase().includes(empFilter));
+  if(socFilter)empList=empList.filter(e=>(e.dept||'').includes(socFilter));
+
+  // Calculer statut par employé par jour
+  function getDayStatus(empId,date){
+    const isoDate=fmtDate(date);
+    const frStr=frDate(date);
+    if(date.getDay()===0)return'X'; // Dimanche
+    const dayLogs=filtered.filter(l=>l.empId===empId&&l.date===frStr);
+    if(!dayLogs.length)return'A';
+    const hasMis=dayLogs.some(l=>l.type==='arrivee'&&l.mission);
+    const hasArr=dayLogs.some(l=>l.type==='arrivee');
+    if(hasMis)return'M';
+    if(hasArr)return'P';
+    return'A';
+  }
+
+  // Stats globales
+  let totalP=0,totalM=0,totalA=0;
+  empList.forEach(emp=>{
+    dates.forEach(d=>{
+      const st=getDayStatus(emp.id,d);
+      if(st==='P')totalP++;else if(st==='M')totalM++;else if(st==='A')totalA++;
+    });
+  });
+  document.getElementById('quick-stats').innerHTML=`
+    <div class="qs"><div class="qsv" style="color:var(--success)">${totalP}</div><div class="qsl">Présences (P)</div></div>
+    <div class="qs"><div class="qsv" style="color:var(--mission)">${totalM}</div><div class="qsl">Missions (M)</div></div>
+    <div class="qs"><div class="qsv" style="color:var(--danger)">${totalA}</div><div class="qsl">Absences (A)</div></div>
+    <div class="qs"><div class="qsv">${empList.length}</div><div class="qsl">Employés</div></div>
+    <div class="qs"><div class="qsv" style="color:var(--muted)">${dates.length}</div><div class="qsl">Jours</div></div>`;
+
+  // Construire tableau
+  const table=document.getElementById('cal-table');
+  let html='<thead><tr><th class="emp-col">Employé</th>';
+  dates.forEach(d=>{
+    const isDim=d.getDay()===0;
+    html+=`<th class="${isDim?'dim':''}" title="${frDate(d)}">${d.getDate()}<br><span style="font-size:.55rem;">${JOURS[d.getDay()]}</span></th>`;
+  });
+  html+='<th style="color:var(--success);">P</th><th style="color:var(--mission);">M</th><th style="color:var(--danger);">A</th></tr></thead><tbody>';
+
+  empList.forEach(emp=>{
+    let cntP=0,cntM=0,cntA=0;
+    const cells=dates.map(d=>{
+      const st=getDayStatus(emp.id,d);
+      if(st==='P')cntP++;else if(st==='M')cntM++;else if(st==='A')cntA++;
+      const cls=st==='P'?'dc-p':st==='M'?'dc-m':st==='A'?'dc-a':st==='X'?'dc-x':'dc-f';
+      return`<td><div class="day-cell ${cls}">${st}</div></td>`;
+    }).join('');
+
+    html+=`<tr>
+      <td class="emp-cell">
+        <div class="emp-name">${emp.nom}</div>
+        <div class="emp-dept">${emp.poste||''}${emp.dept?' · '+emp.dept:''}</div>
+      </td>
+      ${cells}
+      <td class="tot-p">${cntP}</td>
+      <td class="tot-m">${cntM}</td>
+      <td class="tot-a">${cntA}</td>
+    </tr>`;
+  });
+
+  html+='</tbody>';
+  table.innerHTML=html;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COPAY Services — Impression badges QR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyBS5p-6BtA5VCAXiGMHpC9EM1yaiwtN2TE",
+  authDomain: "pointage-d224b.firebaseapp.com",
+  projectId: "pointage-d224b",
+  storageBucket: "pointage-d224b.firebasestorage.app",
+  messagingSenderId: "1058565852224",
+  appId: "1:1058565852224:web:2d47ee1405f1a1828d63a5"
+};
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+window._db = db;
+window._fb = { collection, getDocs, onAuthStateChanged, auth };
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap');
+:root{--bg:#07070f;--surface:#0e0e1a;--card:#141422;--border:#222238;--accent:#c8861a;--accent2:#6c63ff;--success:#00c48c;--danger:#ff4d6d;--text:#e8e8f5;--muted:#5a5a7a;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;}
+
+/* LOADING */
+.loverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;transition:opacity .4s;}
+.loverlay.hide{opacity:0;pointer-events:none;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* HEADER */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;height:60px;display:flex;align-items:center;justify-content:space-between;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;}
+.logo span{color:var(--accent);}
+.hbtns{display:flex;gap:.65rem;align-items:center;}
+.btn{padding:.5rem 1.1rem;border-radius:8px;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:.78rem;font-weight:500;transition:all .2s;}
+.btn-p{background:var(--accent);color:#000;font-weight:700;}
+.btn-p:hover{background:#e09920;}
+.btn-s{background:var(--surface);color:var(--text);border:1px solid var(--border);}
+.btn-s:hover{border-color:var(--accent);color:var(--accent);}
+
+/* CONTROLS */
+.controls{max-width:1200px;margin:1.5rem auto;padding:0 2rem;display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;}
+.ctrl-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.75rem 1.1rem;font-size:.78rem;display:flex;align-items:center;gap:.5rem;}
+.ctrl-card label{color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;}
+.ctrl-card select,.ctrl-card input{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:.35rem .65rem;color:var(--text);font-family:'DM Mono',monospace;font-size:.76rem;outline:none;}
+.stat-pill{background:rgba(200,134,26,.1);border:1px solid rgba(200,134,26,.25);border-radius:20px;padding:.3rem .85rem;font-size:.72rem;color:var(--accent);}
+
+/* BADGES GRID — ÉCRAN */
+.badges-grid{max-width:1200px;margin:0 auto;padding:0 2rem 3rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.2rem;}
+
+/* BADGE CARD */
+.badge-wrap{position:relative;}
+.badge-sel{position:absolute;top:.5rem;left:.5rem;z-index:2;width:20px;height:20px;cursor:pointer;accent-color:var(--accent);}
+.badge-card{background:#fff;border-radius:14px;padding:16px 14px 12px;text-align:center;position:relative;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.3);cursor:pointer;transition:transform .15s;}
+.badge-card:hover{transform:translateY(-2px);}
+.badge-card.selected{outline:3px solid var(--accent);outline-offset:2px;}
+.badge-top{position:absolute;top:0;left:0;right:0;height:7px;background:linear-gradient(90deg,#c8861a,#6c63ff);}
+.badge-photo{width:68px;height:68px;border-radius:50%;object-fit:cover;border:2px solid #c8861a;margin:10px auto 6px;display:block;}
+.badge-ini{width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,#6c63ff,#c8861a);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.4rem;color:#fff;margin:10px auto 6px;border:2px solid #c8861a;}
+.badge-qr{display:flex;justify-content:center;margin:6px 0 4px;}
+.badge-qr canvas,.badge-qr img{border-radius:4px;}
+.badge-name{font-weight:700;font-size:12px;color:#111;margin:3px 0 2px;font-family:sans-serif;}
+.badge-role{font-size:8px;color:#888;text-transform:uppercase;letter-spacing:.8px;font-family:sans-serif;margin-bottom:3px;}
+.badge-id{font-size:8px;background:#f0fdf8;color:#00b88a;padding:2px 7px;border-radius:4px;font-family:monospace;display:inline-block;margin-bottom:2px;}
+.badge-carte{font-size:8px;background:#fff8ec;color:#c8861a;padding:2px 7px;border-radius:4px;font-family:monospace;display:inline-block;}
+.badge-dept{font-size:8px;color:#aaa;font-family:sans-serif;margin-top:2px;}
+
+/* IMPRESSION */
+@media print{
+  body{background:#fff!important;}
+  header,.controls,.no-print{display:none!important;}
+  .badges-grid{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:8px!important;padding:8px!important;max-width:none!important;margin:0!important;}
+  .badge-wrap{break-inside:avoid;}
+  .badge-sel{display:none!important;}
+  .badge-card{box-shadow:0 1px 4px rgba(0,0,0,.12)!important;transform:none!important;outline:none!important;page-break-inside:avoid;}
+  .badge-card.hidden-print{display:none!important;}
+}
+
+.empty{text-align:center;padding:4rem;color:var(--muted);}
+.toast{position:fixed;bottom:2rem;right:2rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.3rem;font-size:.8rem;z-index:9999;transform:translateX(120%);transition:transform .3s;border-left:3px solid var(--success);}
+.toast.show{transform:translateX(0);}
+
+@media(max-width:640px){
+  .controls{padding:0 1rem;}
+  .badges-grid{padding:0 1rem 2rem;grid-template-columns:repeat(2,1fr);}
+  header{padding:0 1rem;}
+}
+</style>
+</head>
+<body>
+
+<div class="loverlay" id="loverlay">
+  <div class="spinner"></div>
+  <div style="font-size:.8rem;color:var(--muted);">Chargement des employés...</div>
+</div>
+
+<header>
+  <div class="logo">COPAY <span>Services</span> — Badges QR</div>
+  <div class="hbtns">
+    <span class="stat-pill" id="stat-pill">0 employé</span>
+    <button class="btn btn-s" onclick="selectAll()">☑ Tout sélectionner</button>
+    <button class="btn btn-s" onclick="deselectAll()">☐ Tout désélectionner</button>
+    <button class="btn btn-p" onclick="printSelected()">🖨️ Imprimer la sélection</button>
+    <a href="dashboard_2.html" class="btn btn-s">← Dashboard</a>
+  </div>
+</header>
+
+<!-- FILTRES -->
+<div class="controls">
+  <div class="ctrl-card">
+    <div>
+      <label>Société</label>
+      <select id="filter-soc" onchange="renderBadges()">
+        <option value="">Tous</option>
+        <option value="Total">Total</option>
+        <option value="Sodigaz">Sodigaz</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctrl-card">
+    <div>
+      <label>Rechercher</label>
+      <input type="text" id="filter-search" placeholder="Nom..." oninput="renderBadges()">
+    </div>
+  </div>
+  <div class="ctrl-card" style="font-size:.72rem;color:var(--muted);">
+    💡 Cliquez sur un badge pour le sélectionner — puis <strong style="color:var(--text);">Imprimer la sélection</strong>
+  </div>
+</div>
+
+<div class="badges-grid" id="badges-grid"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let employees=[], selected=new Set(), fbOk=false;
+
+function ini(n){return(n||'?').split(' ').map(w=>w[0]||'').join('').substring(0,2).toUpperCase();}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+
+window.addEventListener('firebase-ready',()=>{
+  fbOk=true;
+  const{collection,getDocs,onAuthStateChanged,auth}=window._fb,db=window._db;
+  onAuthStateChanged(auth,async user=>{
+    if(!user){window.location.href='dashboard_2.html';return;}
+    const snap=await getDocs(collection(db,'employees'));
+    employees=snap.docs.map(d=>({id:d.id,...d.data()}));
+    document.getElementById('loverlay').classList.add('hide');
+    renderBadges();
+  });
+});
+
+function renderBadges(){
+  const socF=document.getElementById('filter-soc').value;
+  const search=document.getElementById('filter-search').value.toLowerCase().trim();
+  let list=employees;
+  if(socF)list=list.filter(e=>(e.dept||'').includes(socF));
+  if(search)list=list.filter(e=>(e.nom||'').toLowerCase().includes(search));
+
+  document.getElementById('stat-pill').textContent=`${list.length} employé${list.length>1?'s':''}`;
+  const grid=document.getElementById('badges-grid');
+  if(!list.length){grid.innerHTML='<div class="empty">Aucun employé trouvé</div>';return;}
+
+  grid.innerHTML=list.map(emp=>`
+    <div class="badge-wrap">
+      <input type="checkbox" class="badge-sel" id="chk-${emp.id}"
+        ${selected.has(emp.id)?'checked':''}
+        onchange="toggleSel('${emp.id}',this.checked)">
+      <div class="badge-card ${selected.has(emp.id)?'selected':''}"
+        id="card-${emp.id}" onclick="toggleSel('${emp.id}')">
+        <div class="badge-top"></div>
+        ${emp.photo
+          ?`<img class="badge-photo" src="${emp.photo}" alt="${emp.nom}">`
+          :`<div class="badge-ini">${ini(emp.nom)}</div>`}
+        <div class="badge-qr" id="qr-${emp.id}"></div>
+        <div class="badge-name">${emp.nom}</div>
+        <div class="badge-role">${emp.poste||''}</div>
+        <div class="badge-id">${emp.id}</div>
+        ${emp.carte?`<div class="badge-carte">🪪 ${emp.carte}</div>`:''}
+        <div class="badge-dept">${emp.dept||''}</div>
+      </div>
+    </div>`).join('');
+
+  // Générer les QR codes
+  list.forEach(emp=>{
+    const el=document.getElementById(`qr-${emp.id}`);
+    if(el&&!el.hasChildNodes()){
+      new QRCode(el,{text:emp.id,width:90,height:90,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.H});
+    }
+  });
+}
+
+function toggleSel(id, val){
+  const chk=document.getElementById(`chk-${id}`);
+  const card=document.getElementById(`card-${id}`);
+  const newVal= val!==undefined ? val : !selected.has(id);
+  if(newVal){selected.add(id);}else{selected.delete(id);}
+  if(chk)chk.checked=newVal;
+  if(card)card.classList.toggle('selected',newVal);
+}
+
+function selectAll(){
+  const socF=document.getElementById('filter-soc').value;
+  const search=document.getElementById('filter-search').value.toLowerCase().trim();
+  let list=employees;
+  if(socF)list=list.filter(e=>(e.dept||'').includes(socF));
+  if(search)list=list.filter(e=>(e.nom||'').toLowerCase().includes(search));
+  list.forEach(e=>toggleSel(e.id,true));
+  toast(`✅ ${list.length} badges sélectionnés`);
+}
+
+function deselectAll(){
+  selected.forEach(id=>toggleSel(id,false));
+  selected.clear();
+}
+
+function printSelected(){
+  if(selected.size===0){toast('⚠️ Sélectionnez au moins un badge');return;}
+
+  // Masquer les non-sélectionnés pour l'impression
+  document.querySelectorAll('.badge-wrap').forEach(wrap=>{
+    const id=wrap.querySelector('[id^="card-"]')?.id?.replace('card-','');
+    if(id&&!selected.has(id)){
+      wrap.querySelector('.badge-card').classList.add('hidden-print');
+    }
+  });
+
+  toast(`🖨️ Impression de ${selected.size} badge(s)...`);
+  setTimeout(()=>{
+    window.print();
+    // Restaurer après impression
+    document.querySelectorAll('.hidden-print').forEach(el=>el.classList.remove('hidden-print'));
+  },500);
+}
+</script>
+</body>
+</html>
