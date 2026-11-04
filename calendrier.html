@@ -217,17 +217,14 @@ function renderCal(){
   if(socFilter)empList=empList.filter(e=>(e.dept||'').includes(socFilter));
 
   // Calculer statut par employé par jour
+  const _t0=new Date();_t0.setHours(0,0,0,0);
   function getDayStatus(empId,date){
-    const isoDate=fmtDate(date);
+    if(date>_t0)return'';            // jour à venir : rien n'est compté
     const frStr=frDate(date);
-    if(date.getDay()===0)return'X'; // Dimanche
     const dayLogs=filtered.filter(l=>l.empId===empId&&l.date===frStr);
-    if(!dayLogs.length)return'A';
-    const hasMis=dayLogs.some(l=>l.type==='arrivee'&&l.mission);
-    const hasArr=dayLogs.some(l=>l.type==='arrivee');
-    if(hasMis)return'M';
-    if(hasArr)return'P';
-    return'A';
+    if(dayLogs.some(l=>l.type==='arrivee'&&l.mission))return'M';
+    if(dayLogs.some(l=>l.type==='arrivee'))return'P';   // dimanche travaillé = P (comme l'export Excel)
+    return date.getDay()===0?'X':'A';
   }
 
   // Stats globales

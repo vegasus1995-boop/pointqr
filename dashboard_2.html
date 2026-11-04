@@ -6,7 +6,7 @@
 <title>COPAY Services — Dashboard v3</title>
 <meta name="theme-color" content="#c8861a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -212,6 +212,12 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
 .msub{font-size:.73rem;color:var(--muted);margin-bottom:1.4rem;}
 #map-detail{height:340px;border-radius:10px;margin-top:.75rem;}
 
+/* ── SOCIÉTÉ ── */
+.soc-row{display:flex;align-items:center;gap:.5rem;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:.5rem .75rem;}
+.soc-btn{padding:.35rem .85rem;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-family:'DM Mono',monospace;font-size:.72rem;cursor:pointer;}
+.soc-btn:hover{border-color:var(--accent);color:var(--text);}
+.soc-btn.on-sod{background:rgba(0,196,140,.15);color:var(--success);border-color:rgba(0,196,140,.45);font-weight:700;}
+.soc-btn.on-tot{background:rgba(46,117,182,.22);color:#6fb1ff;border-color:rgba(46,117,182,.5);font-weight:700;}
 /* ── TOAST ── */
 .toast{position:fixed;bottom:2rem;right:2rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.9rem 1.3rem;font-size:.8rem;z-index:9999;transform:translateX(120%);transition:transform .3s ease;max-width:300px;border-left:3px solid var(--success);}
 .toast.show{transform:translateX(0);}
@@ -270,8 +276,10 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
   <div class="hdr-right">
     <span class="fb-pill" id="fbpill">⏳ Connexion...</span>
     <span class="user-info" id="user-info"></span>
-    <button class="hbtn" onclick="window.open('scanner_securite.html','_blank')">🔒 Agent sécu</button>
-    <button class="hbtn" onclick="window.open('scanner_livreur.html','_blank')">🚗 Livreur</button>
+    <button class="hbtn" onclick="window.open('app.html?role=sec','_blank')">🔒 Agent sécu</button>
+    <button class="hbtn" onclick="window.open('app.html?role=liv','_blank')">🚗 Livreur</button>
+    <button class="hbtn sec" onclick="window.open('badges_print.html','_blank')">📛 Badges</button>
+    <button class="hbtn sec" onclick="window.open('calendrier.html','_blank')">📅 Calendrier</button>
     <button class="hbtn sec" onclick="doLogout()">Déconnexion</button>
   </div>
 </header>
@@ -292,6 +300,7 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
 <div id="page-dashboard" class="page active">
   <div class="stats-grid" id="sgrid"></div>
   <!-- Mini notification rapide -->
+  <div id="export-reminder" style="margin-bottom:1rem;"></div>
   <div id="quick-notif" style="margin-bottom:1.5rem;"></div>
   <div class="card">
     <div class="ctitle">Présences en temps réel <span style="font-size:.62rem;color:var(--success);font-weight:400;">● LIVE</span></div>
@@ -309,8 +318,8 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
     </div>
     <div style="padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
       <span style="font-size:.72rem;color:var(--muted);">Heure de référence :</span>
-      <input type="time" id="ref-time" value="08:00" style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:.35rem .65rem;color:var(--text);font-family:'DM Mono',monospace;font-size:.78rem;outline:none;" onchange="renderNotifs()">
-      <span style="font-size:.7rem;color:var(--muted);">— Les absents sont ceux non pointés avant cette heure</span>
+      <input type="time" id="ref-time" value="08:00" style="background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:.35rem .65rem;color:var(--text);font-family:'DM Mono',monospace;font-size:.78rem;outline:none;" onchange="saveRef()">
+      <span style="font-size:.7rem;color:var(--muted);">Avant cette heure : « attendus ». Après : « absents ». Les arrivées plus tardives sont signalées en retard.</span>
     </div>
     <div class="notif-grid">
       <div class="notif-col">
@@ -318,7 +327,7 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
         <div id="notif-presents"></div>
       </div>
       <div class="notif-col">
-        <div class="notif-col-title"><div class="dot-a"></div>Pas encore arrivés (<span id="acnt2">0</span>)</div>
+        <div class="notif-col-title"><div class="dot-a"></div><span id="acol-label">Pas encore arrivés</span> (<span id="acnt2">0</span>)</div>
         <div id="notif-absents"></div>
       </div>
     </div>
@@ -348,6 +357,7 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
 
 <!-- EMPLOYÉS -->
 <div id="page-employes" class="page">
+  <div id="soc-card"></div>
   <div class="card">
     <div class="ctitle">Ajouter un employé</div>
     <div class="fgrid">
@@ -360,7 +370,7 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
       </div>
       <div class="fg"><label>Prénom & Nom *</label><input id="en" type="text" placeholder="Marie Dupont"></div>
       <div class="fg"><label>Poste *</label><input id="ep" type="text" placeholder="Chauffeur, Agent..."></div>
-      <div class="fg"><label>Société</label><input id="ed" type="text" placeholder="Total ou Sodigaz"></div>
+      <div class="fg"><label>Société</label><select id="ed"><option value="">— Choisir —</option><option value="Total">Total</option><option value="Sodigaz">Sodigaz</option></select></div>
       <div class="fg"><label>Téléphone</label><input id="et" type="tel" placeholder="+228 XX XX XX XX"></div>
       <div class="fg"><label>🪪 Numéro de carte</label><input id="ec" type="text" placeholder="CART-001"></div>
       <div class="fg"><label>🚗 Plaque voiture</label><input id="ev" type="text" placeholder="TG 8560 AU"></div>
@@ -418,18 +428,13 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
           <option value="Sodigaz">Sodigaz uniquement</option>
         </select>
       </div>
-      <div class="fg"><label>📊 Type</label>
-        <select id="xtype">
-          <option value="both">Pointage + Récap missions (2 feuilles)</option>
-          <option value="pointage">Pointage détaillé seulement</option>
-          <option value="missions">Récap missions + primes seulement</option>
-        </select>
-      </div>
+      <div class="fg"><label>📄 Contenu du fichier</label><div style="font-size:.72rem;color:var(--muted);padding:.55rem 0;line-height:1.5;">Feuille Sodigaz · feuille Total · Récap Mensuel · Base de Données</div></div>
     </div>
   </div>
   <div id="xpreview-card" style="display:none;">
     <div class="card">
       <div class="ctitle">👁️ Aperçu — <span id="xperiod-label">—</span></div>
+      <div id="xwarn"></div>
       <div class="prev-stats" id="xstats"></div>
       <div style="overflow-x:auto;">
         <table class="ltable">
@@ -462,7 +467,7 @@ main{max-width:1300px;margin:0 auto;padding:2rem;}
       </div>
       <div class="fg"><label>Prénom & Nom</label><input id="edit-nom" type="text"></div>
       <div class="fg"><label>Poste</label><input id="edit-poste" type="text"></div>
-      <div class="fg"><label>Société</label><input id="edit-dept" type="text"></div>
+      <div class="fg"><label>Société</label><select id="edit-dept"><option value="">— Choisir —</option><option value="Total">Total</option><option value="Sodigaz">Sodigaz</option></select></div>
       <div class="fg"><label>Téléphone</label><input id="edit-tel" type="tel"></div>
       <div class="fg"><label>🪪 Numéro de carte</label><input id="edit-carte" type="text"></div>
       <div class="fg"><label>🚗 Plaque voiture</label><input id="edit-plaque" type="text"></div>
@@ -498,6 +503,7 @@ const BAREME=[[0,0,0],[1,2,500],[3,3,1000],[4,5,1500],[6,6,2000],[7,8,2500],[9,9
 function getPrime(n){for(const[a,b,p]of BAREME)if(n>=a&&n<=b)return p;return 8000;}
 
 // ── ÉTAT ─────────────────────────────────────────────────────────
+let logsReady=false;
 let employees=[],logs=[],curPhoto=null,mapDet=null,mMapInst=null,mMarkers=null,mFilter='all',fbOk=false,currentUser=null;
 const OFFLINE_KEY='copay_offline_logs';
 
@@ -509,7 +515,14 @@ function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2
 function frDate(s){const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
 function parsefrDate(s){const[d,m,y]=s.split('/');return new Date(+y,+m-1,+d);}
 function closeMod(id){document.getElementById(id).classList.remove('open');if(id==='mapmod'&&mapDet){mapDet.remove();mapDet=null;}}
-function getSt(id){const el=logs.filter(l=>l.empId===id);if(!el.length)return'absent';const last=el[el.length-1];return last.type==='arrivee'?(last.mission?'mission':'present'):'absent';}
+function getSt(id){const _t=new Date().toLocaleDateString('fr-FR');const el=logs.filter(l=>l.empId===id&&l.date===_t);if(!el.length)return'absent';const last=el[el.length-1];return last.type==='arrivee'?(last.mission?'mission':'present'):'absent';}
+function firstArrival(id){const t=new Date().toLocaleDateString('fr-FR');return logs.find(l=>l.empId===id&&l.date===t&&l.type==='arrivee');}
+function nonPointes(){return employees.filter(e=>getSt(e.id)==='absent'&&!firstArrival(e.id));}
+function minOf(t){const[h,m]=String(t||'0:0').split(':').map(Number);return h*60+(m||0);}
+function refTimeStr(){const el=document.getElementById('ref-time');return(el&&el.value)||'08:00';}
+function isSunday(){return new Date().getDay()===0;}
+function isLate(){const n=new Date();return !isSunday()&&n.getHours()*60+n.getMinutes()>=minOf(refTimeStr());}
+function saveRef(){try{localStorage.setItem('copay_ref',refTimeStr());}catch(e){}renderDash();renderNotifs();}
 function getLastLog(id){const today=new Date().toLocaleDateString('fr-FR');return logs.filter(l=>l.empId===id&&l.date===today).slice(-1)[0];}
 
 // ── OFFLINE ────────────────────────────────────────────────────────
@@ -529,6 +542,7 @@ async function syncOfflineLogs(){
 // ── AUTH ──────────────────────────────────────────────────────────
 window.addEventListener('firebase-ready',()=>{
   fbOk=true;
+  try{const _r=localStorage.getItem('copay_ref');if(_r)document.getElementById('ref-time').value=_r;}catch(e){}
   const{onAuthStateChanged,collection,onSnapshot,query,orderBy}=window._fb,auth=window._auth,db=window._db;
   onAuthStateChanged(auth,user=>{
     if(user){
@@ -543,7 +557,7 @@ window.addEventListener('firebase-ready',()=>{
       });
       const q=query(collection(db,'logs'),orderBy('ts','asc'));
       onSnapshot(q,snap=>{
-        logs=snap.docs.map(d=>({_id:d.id,...d.data()}));
+        logs=snap.docs.map(d=>({_id:d.id,...d.data()}));logsReady=true;
         renderDash();renderNotifs();
         const ap=document.querySelector('.page.active');
         if(ap&&ap.id==='page-historique')renderLogs();
@@ -598,7 +612,7 @@ function renderDash(){
   const tl=logs.filter(l=>l.date===today);
   const pN=employees.filter(e=>getSt(e.id)==='present').length;
   const mN=employees.filter(e=>getSt(e.id)==='mission').length;
-  const aN=employees.filter(e=>getSt(e.id)==='absent').length;
+  const aN=nonPointes().length;
 
   // Update absent badge
   document.getElementById('absent-badge').textContent=aN;
@@ -614,23 +628,21 @@ function renderDash(){
     <div class="sc"><div class="sv">${tl.filter(l=>l.type==='arrivee').length}</div><div class="sl">Arrivées auj.</div></div>
     <div class="sc"><div class="sv" style="color:var(--muted)">${employees.length}</div><div class="sl">Total employés</div></div>`;
 
-  // Quick notif
-  const absents=employees.filter(e=>getSt(e.id)==='absent');
-  if(absents.length>0){
-    document.getElementById('quick-notif').innerHTML=`
-      <div style="background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.2);border-radius:10px;padding:.85rem 1.1rem;display:flex;align-items:center;gap:.75rem;">
-        <div style="font-size:1.5rem;">⚠️</div>
-        <div>
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;color:var(--danger);">${absents.length} employé(s) pas encore arrivé(s)</div>
-          <div style="font-size:.7rem;color:var(--muted);margin-top:2px;">${absents.slice(0,3).map(e=>e.nom).join(', ')}${absents.length>3?' + '+(absents.length-3)+' autres':''}</div>
-        </div>
-        <button class="btn btn-sm" style="margin-left:auto;background:rgba(255,77,109,.1);color:var(--danger);border:1px solid rgba(255,77,109,.25);" onclick="showPage('notifications',document.querySelectorAll('.ntab')[1])">Voir →</button>
-      </div>`;
+  renderExportReminder();
+  // Alerte absents (selon l'heure de référence)
+  const absents=nonPointes(),qn=document.getElementById('quick-notif'),ref=refTimeStr();
+  if(isSunday()){
+    qn.innerHTML=`<div style="background:rgba(90,90,122,.1);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.1rem;font-size:.82rem;color:var(--muted);">😴 Dimanche — jour de repos</div>`;
+  } else if(absents.length>0){
+    const late=isLate(),col=late?'255,77,109':'230,160,32',tc=late?'var(--danger)':'var(--mission)';
+    qn.innerHTML=`<div style="background:rgba(${col},.08);border:1px solid rgba(${col},.25);border-radius:10px;padding:.85rem 1.1rem;display:flex;align-items:center;gap:.75rem;">
+      <div style="font-size:1.5rem;">${late?'⚠️':'⏳'}</div>
+      <div><div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;color:${tc};">${absents.length} employé(s) ${late?'non pointé(s) après '+ref:'attendu(s) avant '+ref}</div>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:2px;">${absents.slice(0,3).map(e=>e.nom).join(', ')}${absents.length>3?' + '+(absents.length-3)+' autres':''}</div></div>
+      <button class="btn btn-sm" style="margin-left:auto;background:rgba(${col},.1);color:${tc};border:1px solid rgba(${col},.3);" onclick="showPage('notifications',document.querySelectorAll('.ntab')[1])">Voir →</button></div>`;
+    if(late&&!window._alertShown&&logsReady&&employees.length){window._alertShown=true;toast(`⚠️ ${absents.length} non pointé(s) après ${ref}`,absents.slice(0,3).map(e=>e.nom).join(', '),'warn');}
   } else {
-    document.getElementById('quick-notif').innerHTML=`
-      <div style="background:rgba(0,196,140,.07);border:1px solid rgba(0,196,140,.2);border-radius:10px;padding:.85rem 1.1rem;font-size:.82rem;color:var(--success);">
-        ✅ Tous les employés sont présents ou en mission !
-      </div>`;
+    qn.innerHTML=`<div style="background:rgba(0,196,140,.07);border:1px solid rgba(0,196,140,.2);border-radius:10px;padding:.85rem 1.1rem;font-size:.82rem;color:var(--success);">✅ Tous les employés ont pointé !</div>`;
   }
 
   // Live grid
@@ -638,7 +650,7 @@ function renderDash(){
   lg.innerHTML=employees.map(emp=>{
     const st=getSt(emp.id),ll=getLastLog(emp.id);
     const cc=st==='present'?'cp':st==='mission'?'cm':'ca';
-    const ct=st==='present'?'✅ Présent':st==='mission'?'🚗 Mission':'⚠️ Absent';
+    const _dep=st==='absent'&&firstArrival(emp.id);const ct=st==='present'?'✅ Présent':st==='mission'?'🚗 Mission':_dep?'🚪 Parti':(isSunday()?'😴 Repos':'⚠️ Absent');
     const cd=st==='present'?'present':st==='mission'?'mission-card':'absent';
     const av=emp.photo?`<div class="lavatar"><img src="${emp.photo}"></div>`:`<div class="lavatar">${ini(emp.nom)}</div>`;
     const li=ll?`${ll.type==='arrivee'?'Arrivé':'Parti'} à ${ll.time}`:'Pas encore pointé';
@@ -665,63 +677,68 @@ function renderDash(){
 
 // ── NOTIFICATIONS ─────────────────────────────────────────────────
 function renderNotifs(){
-  const today=new Date().toLocaleDateString('fr-FR');
-  const refTime=document.getElementById('ref-time').value||'08:00';
-  document.getElementById('notif-update').textContent=`Mis à jour : ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · Réf: ${refTime}`;
-
-  const presents=[],absents=[],missions=[];
+  const ref=refTimeStr(),late=isLate(),sunday=isSunday();
+  document.getElementById('notif-update').textContent=`Mis à jour : ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · Heure de référence : ${ref}`;
+  const presents=[],partis=[],missions=[],absents=[];
   employees.forEach(emp=>{
-    const st=getSt(emp.id),ll=getLastLog(emp.id);
-    if(st==='mission'){missions.push({emp,ll});}
-    else if(st==='present'){presents.push({emp,ll});}
-    else{
-      // Absent si pas pointé du tout ou parti avant ref time
-      absents.push({emp,ll});
-    }
+    const st=getSt(emp.id),ll=getLastLog(emp.id),fa=firstArrival(emp.id);
+    if(st==='mission')missions.push({emp,ll});
+    else if(st==='present')presents.push({emp,ll,fa});
+    else if(fa)partis.push({emp,ll,fa});
+    else absents.push({emp});
   });
-
   document.getElementById('pcnt2').textContent=presents.length;
   document.getElementById('acnt2').textContent=absents.length;
-
-  // Présents
-  document.getElementById('notif-presents').innerHTML=presents.length?
-    presents.map(({emp,ll})=>{
-      const av=emp.photo?`<div class="navi"><img src="${emp.photo}"></div>`:`<div class="navi">${ini(emp.nom)}</div>`;
-      return`<div class="notif-item">${av}<div class="ninfo"><div class="nname">${emp.nom}</div><div class="ntime">✅ Arrivé à ${ll?ll.time:'—'}</div></div><div class="dot-p"></div></div>`;
-    }).join(''):
-    '<div style="font-size:.75rem;color:var(--muted);padding:.5rem 0;">Aucun présent</div>';
-
-  // Absents
-  document.getElementById('notif-absents').innerHTML=absents.length?
-    absents.map(({emp})=>{
-      const av=emp.photo?`<div class="navi"><img src="${emp.photo}"></div>`:`<div class="navi" style="background:rgba(255,77,109,.2);">${ini(emp.nom)}</div>`;
-      return`<div class="notif-item">${av}<div class="ninfo"><div class="nname">${emp.nom}</div><div class="nabsent">⚠️ Pas encore pointé</div></div><div class="dot-a"></div></div>`;
-    }).join(''):
-    '<div style="font-size:.75rem;color:var(--success);padding:.5rem 0;">✅ Tout le monde est arrivé !</div>';
-
-  // Missions
+  document.getElementById('acol-label').textContent=sunday?'Pas pointés (dimanche)':late?'Absents — non pointés':'Attendus — pas encore arrivés';
+  const av=(emp,red)=>emp.photo?`<div class="navi"><img src="${emp.photo}"></div>`:`<div class="navi"${red?' style="background:rgba(255,77,109,.2);"':''}>${ini(emp.nom)}</div>`;
+  let ph=presents.length?presents.map(({emp,fa})=>{
+    const retard=fa&&minOf(fa.time)>minOf(ref);
+    return`<div class="notif-item">${av(emp)}<div class="ninfo"><div class="nname">${emp.nom}</div><div class="ntime">✅ Arrivé à ${fa?fa.time:'—'}${retard?' · <span style="color:var(--mission)">🕘 en retard</span>':''}</div></div><div class="dot-p"></div></div>`;
+  }).join(''):'<div style="font-size:.75rem;color:var(--muted);padding:.5rem 0;">Aucun présent</div>';
+  if(partis.length)ph+=`<div style="font-size:.62rem;color:var(--muted);margin:.7rem 0 .2rem;text-transform:uppercase;letter-spacing:.08em;">🚪 Déjà partis (${partis.length})</div>`+partis.map(({emp,ll,fa})=>`<div class="notif-item" style="opacity:.7;">${av(emp)}<div class="ninfo"><div class="nname">${emp.nom}</div><div class="ntime" style="color:var(--muted);">Arrivé ${fa.time} · parti ${ll?ll.time:'—'}</div></div></div>`).join('');
+  document.getElementById('notif-presents').innerHTML=ph;
+  document.getElementById('notif-absents').innerHTML=absents.length?absents.map(({emp})=>
+    `<div class="notif-item">${av(emp,true)}<div class="ninfo"><div class="nname">${emp.nom}</div><div class="nabsent">${sunday?'😴 Repos':late?'⚠️ Absent — pas pointé':'⏳ Attendu avant '+ref}</div></div><div class="dot-a"></div></div>`).join('')
+    :'<div style="font-size:.75rem;color:var(--success);padding:.5rem 0;">✅ Tout le monde a pointé !</div>';
   document.getElementById('notif-missions').innerHTML=missions.length?
     `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.65rem;">`+
-    missions.map(({emp,ll})=>{
-      const av=emp.photo?`<div class="navi"><img src="${emp.photo}"></div>`:`<div class="navi">${ini(emp.nom)}</div>`;
-      return`<div style="background:rgba(230,160,32,.07);border:1px solid rgba(230,160,32,.2);border-radius:9px;padding:.65rem .85rem;display:flex;align-items:center;gap:.65rem;">
-        ${av}<div><div style="font-size:.8rem;font-weight:600;">${emp.nom}</div>
-        <div style="font-size:.63rem;color:var(--mission);">🚗 Mission depuis ${ll?ll.time:'—'}${ll&&ll.ville?' · '+ll.ville:''}</div></div>
-      </div>`;
-    }).join('')+'</div>':
+    missions.map(({emp,ll})=>`<div style="background:rgba(230,160,32,.07);border:1px solid rgba(230,160,32,.2);border-radius:9px;padding:.65rem .85rem;display:flex;align-items:center;gap:.65rem;">${av(emp)}<div><div style="font-size:.8rem;font-weight:600;">${emp.nom}</div>
+      <div style="font-size:.63rem;color:var(--mission);">🚗 Mission depuis ${ll?ll.time:'—'}${ll&&ll.ville?' · '+ll.ville:''}</div></div></div>`).join('')+'</div>':
     '<div style="font-size:.75rem;color:var(--muted);">Aucune mission en cours</div>';
 }
 
 function sendNotifReport(){
-  const today=new Date().toLocaleDateString('fr-FR');
-  const presents=employees.filter(e=>getSt(e.id)==='present');
-  const missions=employees.filter(e=>getSt(e.id)==='mission');
-  const absents=employees.filter(e=>getSt(e.id)==='absent');
-  let txt=`📋 RAPPORT PRÉSENCE COPAY SERVICES\n${today} — ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}\n\n`;
-  txt+=`✅ PRÉSENTS (${presents.length}):\n`+presents.map(e=>{const ll=getLastLog(e.id);return`• ${e.nom} — ${ll?ll.time:'—'}`;}).join('\n');
-  txt+=`\n\n🚗 EN MISSION (${missions.length}):\n`+missions.map(e=>{const ll=getLastLog(e.id);return`• ${e.nom}${ll&&ll.ville?' — '+ll.ville:''}`;}).join('\n');
-  txt+=`\n\n⚠️ PAS ENCORE ARRIVÉS (${absents.length}):\n`+absents.map(e=>`• ${e.nom}`).join('\n');
+  const today=new Date().toLocaleDateString('fr-FR'),ref=refTimeStr(),late=isLate();
+  const pres=employees.filter(e=>getSt(e.id)==='present'),mis=employees.filter(e=>getSt(e.id)==='mission');
+  const par=employees.filter(e=>getSt(e.id)==='absent'&&firstArrival(e.id)),abs=nonPointes();
+  const retards=pres.concat(par).filter(e=>minOf(firstArrival(e.id).time)>minOf(ref));
+  const L=(arr,f)=>arr.length?arr.map(f).join('\n'):'—';
+  let txt=`📋 RAPPORT PRÉSENCE — COPAY SERVICES\n${today} à ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}\n\n`;
+  txt+=`✅ PRÉSENTS (${pres.length}) :\n`+L(pres,e=>`• ${e.nom} — ${firstArrival(e.id).time}`);
+  if(par.length)txt+=`\n\n🚪 DÉJÀ PARTIS (${par.length}) :\n`+L(par,e=>`• ${e.nom} — parti à ${getLastLog(e.id).time}`);
+  txt+=`\n\n🚗 EN MISSION (${mis.length}) :\n`+L(mis,e=>{const ll=getLastLog(e.id);return`• ${e.nom}${ll&&ll.ville?' — '+ll.ville:''}`;});
+  if(retards.length)txt+=`\n\n🕘 EN RETARD (après ${ref}) :\n`+L(retards,e=>`• ${e.nom} — ${firstArrival(e.id).time}`);
+  txt+=`\n\n${isSunday()?'😴 PAS POINTÉS (dimanche)':late?'⚠️ ABSENTS — non pointés':'⏳ ATTENDUS'} (${abs.length}) :\n`+L(abs,e=>`• ${e.nom}`);
   navigator.clipboard.writeText(txt).then(()=>toast('📋 Rapport copié !','Collez dans WhatsApp ou SMS')).catch(()=>{alert(txt);});
+}
+
+// ── RAPPEL D'EXPORT (15 → 18 du mois) ─────────────────────────────
+function renderExportReminder(){
+  const el=document.getElementById('export-reminder');if(!el)return;
+  const t=new Date(),d=t.getDate();
+  if(d<15||d>18){el.innerHTML='';return;}
+  const from=fmtDate(new Date(t.getFullYear(),t.getMonth()-1,16)),to=fmtDate(new Date(t.getFullYear(),t.getMonth(),15));
+  let done=false;try{done=!!localStorage.getItem('exp_'+from);}catch(e){}
+  if(done){el.innerHTML='';return;}
+  el.innerHTML=`<div style="background:rgba(200,134,26,.08);border:1px solid rgba(200,134,26,.3);border-radius:10px;padding:.85rem 1.1rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+    <div style="font-size:1.5rem;">📅</div>
+    <div><div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.85rem;color:var(--accent);">${d===15?'La période se termine aujourd\'hui':'La période est terminée'} — du ${frDate(from)} au ${frDate(to)}</div>
+    <div style="font-size:.7rem;color:var(--muted);margin-top:2px;">Exportez le fichier Excel pour la paie et les primes.</div></div>
+    <button class="btn btn-p btn-sm" style="margin-left:auto;" onclick="goExport('${d===15?'current':'prev'}')">⬇️ Exporter</button></div>`;
+}
+function goExport(kind){
+  const btn=[...document.querySelectorAll('.ntab')].find(b=>(b.getAttribute('onclick')||'').includes("'export'"));
+  showPage('export',btn);setPeriod(kind,null);
 }
 
 // ── MAP ───────────────────────────────────────────────────────────
@@ -737,6 +754,7 @@ async function addEmp(){
   if(!fbOk){toast('Firebase non connecté','','err');return;}
   const nom=document.getElementById('en').value.trim(),poste=document.getElementById('ep').value.trim();
   if(!nom||!poste){toast('Nom et poste requis','','err');return;}
+  if(!document.getElementById('ed').value){toast('Choisissez la société (Total ou Sodigaz)','','err');return;}
   const dept=document.getElementById('ed').value.trim(),tel=document.getElementById('et').value.trim(),carte=document.getElementById('ec').value.trim(),plaque=document.getElementById('ev').value.trim();
   const btn=document.getElementById('addbtn');btn.textContent='⏳...';btn.disabled=true;
   const{doc,setDoc}=window._fb,db=window._db;
@@ -759,7 +777,7 @@ function openEdit(empId){
   document.getElementById('edit-sub').textContent=`ID : ${emp.id}`;
   document.getElementById('edit-nom').value=emp.nom||'';
   document.getElementById('edit-poste').value=emp.poste||'';
-  document.getElementById('edit-dept').value=emp.dept||'';
+  document.getElementById('edit-dept').value=socOf(emp);
   document.getElementById('edit-tel').value=emp.tel||'';
   document.getElementById('edit-carte').value=emp.carte||'';
   document.getElementById('edit-plaque').value=emp.plaque||'';
@@ -807,6 +825,7 @@ async function saveEdit(){
 async function delEmp(id){if(!confirm('Supprimer cet employé ?'))return;const{doc,deleteDoc}=window._fb;await deleteDoc(doc(window._db,'employees',id));toast('Supprimé','','err');}
 
 function renderEmp(search=''){
+  renderSoc();
   document.getElementById('ecnt').textContent=employees.length;
   let list=employees;
   if(search)list=employees.filter(e=>(e.nom||'').toLowerCase().includes(search.toLowerCase())||(e.carte||'').toLowerCase().includes(search.toLowerCase()));
@@ -815,7 +834,7 @@ function renderEmp(search=''){
   el.innerHTML=list.map(emp=>{
     const st=getSt(emp.id),b=st==='present'?'<span class="chip cp">✅ Présent</span>':st==='mission'?'<span class="chip cm">🚗 Mission</span>':'<span class="chip ca">⚠️ Absent</span>';
     const av=emp.photo?`<div class="eavatar"><img src="${emp.photo}"></div>`:`<div class="eavatar">${ini(emp.nom)}</div>`;
-    return`<div class="erow">${av}<div class="einfo"><div class="ename">${emp.nom}</div><div class="emeta">${emp.poste||''}${emp.dept?' · '+emp.dept:''}${emp.tel?' · '+emp.tel:''}</div>${emp.carte?`<span class="ecarte">🪪 ${emp.carte}</span>`:''}</div>
+    return`<div class="erow">${av}<div class="einfo"><div class="ename">${emp.nom}</div><div class="emeta">${emp.poste||''}${socOf(emp)?' · '+socOf(emp):' · ⚠️ société à choisir'}${emp.tel?' · '+emp.tel:''}</div>${emp.carte?`<span class="ecarte">🪪 ${emp.carte}</span>`:''}</div>
     <span class="eid">${emp.id}</span>${b}
     <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
       <button class="btn btn-s btn-sm" onclick="showQR('${emp.id}')">📛 QR</button>
@@ -888,191 +907,197 @@ function setPeriod(type,btn){
   document.getElementById('xfrom').value=from;document.getElementById('xto').value=to;loadXPreview();
 }
 
+// ── SOCIÉTÉ ───────────────────────────────────────────────────────
+function socOf(e){const d=((e&&e.dept)||'').toLowerCase();return d.includes('sodigaz')?'Sodigaz':d.includes('total')?'Total':'';}
+function renderSoc(){
+  const el=document.getElementById('soc-card');if(!el)return;
+  const nS=employees.filter(e=>socOf(e)==='Sodigaz').length,nT=employees.filter(e=>socOf(e)==='Total').length,nN=employees.length-nS-nT;
+  const sorted=[...employees].sort((a,b)=>(socOf(a)?1:0)-(socOf(b)?1:0)||(a.plaque||'').localeCompare(b.plaque||'')||(a.nom||'').localeCompare(b.nom||''));
+  el.innerHTML=`<div class="card"><div class="ctitle">🏢 Société de chaque employé</div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;font-size:.72rem;">
+      <span class="chip cp">Sodigaz : ${nS}</span><span class="chip" style="background:rgba(46,117,182,.15);color:#6fb1ff;border:1px solid rgba(46,117,182,.4);">Total : ${nT}</span>
+      ${nN?`<span class="chip ca">⚠️ Non affectés : ${nN}</span>`:'<span class="chip cp">✅ Tous affectés</span>'}</div>
+    <div style="display:grid;gap:.4rem;">${sorted.map(e=>{const s=socOf(e);return`<div class="soc-row"><div style="flex:1;min-width:0;"><div class="ename" style="font-size:.82rem;">${e.nom||'—'}</div><div class="emeta">${e.plaque||'sans plaque'}${e.poste?' · '+e.poste:''}</div></div>
+      <button class="soc-btn ${s==='Sodigaz'?'on-sod':''}" onclick="setSoc('${e.id}','Sodigaz')">Sodigaz</button>
+      <button class="soc-btn ${s==='Total'?'on-tot':''}" onclick="setSoc('${e.id}','Total')">Total</button></div>`;}).join('')}</div></div>`;
+}
+async function setSoc(id,soc){
+  if(!fbOk){toast('Firebase non connecté','','err');return;}
+  try{const{doc,setDoc}=window._fb;await setDoc(doc(window._db,'employees',id),{dept:soc},{merge:true});
+    toast('✅ '+soc,(employees.find(e=>e.id===id)||{}).nom||'');}catch(e){console.error(e);toast('Erreur d\'enregistrement','','err');}
+}
+
+// ── EXPORT : aperçu ───────────────────────────────────────────────
+const frOf=d=>String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
 function loadXPreview(){
   const from=document.getElementById('xfrom').value,to=document.getElementById('xto').value;
   if(!from||!to||!fbOk)return;
-  const fromD=new Date(from),toD=new Date(to);toD.setHours(23,59,59);
+  const fromD=new Date(from+'T00:00:00'),toD=new Date(to+'T00:00:00');
   const socF=document.getElementById('xsoc').value;
   document.getElementById('xperiod-label').textContent=`${frDate(from)} → ${frDate(to)}`;
-
-  const filtered=logs.filter(l=>{const d=parsefrDate(l.date);return d>=fromD&&d<=toD;});
-  const empMap={};
-  employees.forEach(e=>{
-    const soc=(e.dept||'').includes('Total')?'Total':(e.dept||'').includes('Sodigaz')?'Sodigaz':(e.dept||'—');
-    if(socF&&soc!==socF)return;
-    empMap[e.id]={id:e.id,nom:e.nom,poste:e.poste||'',soc,carte:e.carte||'',plaque:e.plaque||'',presences:0,missions:0,jours:new Set()};
-  });
-  filtered.forEach(l=>{
-    if(!empMap[l.empId]){const soc='—';if(socF&&soc!==socF)return;empMap[l.empId]={id:l.empId,nom:l.empNom,poste:l.empPoste||'',soc,carte:l.empCarte||'',plaque:'',presences:0,missions:0,jours:new Set()};}
-    if(l.type==='arrivee'){empMap[l.empId].jours.add(l.date);if(l.mission)empMap[l.empId].missions++;else empMap[l.empId].presences++;}
-  });
-  const list=Object.values(empMap).filter(e=>e.nom);
-  list.forEach(e=>{e.prime=getPrime(e.missions);});
-  const totP=list.reduce((s,e)=>s+e.presences,0),totM=list.reduce((s,e)=>s+e.missions,0),totPrime=list.reduce((s,e)=>s+e.prime,0);
+  // index des pointages par employé + jour (un jour compte une seule fois)
+  const idx={};
+  logs.forEach(l=>{if(l.type!=='arrivee')return;const k=l.empId+'|'+l.date;const r=idx[k]||(idx[k]={mis:false});if(l.mission)r.mis=true;});
+  const _t0=new Date();_t0.setHours(0,0,0,0);
+  const getStatus=(emp,d)=>{const r=idx[emp.id+'|'+frOf(d)];return r?(r.mis?'M':'P'):(d>_t0?'':(d.getDay()===0?'X':'A'));};
+  const sortFn=(a,b)=>(a.plaque||'').localeCompare(b.plaque||'')||(a.nom||'').localeCompare(b.nom||'');
+  const groups=[];
+  ['Sodigaz','Total'].forEach(n=>{if(socF&&socF!==n)return;groups.push({name:n,emps:employees.filter(e=>socOf(e)===n).sort(sortFn)});});
+  const na=employees.filter(e=>!socOf(e)).sort(sortFn);
+  if(!socF&&na.length)groups.push({name:'Non affectés',emps:na});
+  const dates=[];for(let d=new Date(fromD);d<=toD;d.setDate(d.getDate()+1))dates.push(new Date(d));
+  const list=[];groups.forEach(g=>g.emps.forEach(e=>{let p=0,m=0;dates.forEach(d=>{const s=getStatus(e,d);if(s==='P')p++;else if(s==='M')m++;});list.push({e,soc:g.name,p,m,prime:getPrime(m)});}));
+  const totP=list.reduce((s,x)=>s+x.p,0),totM=list.reduce((s,x)=>s+x.m,0),totPrime=list.reduce((s,x)=>s+x.prime,0);
+  document.getElementById('xwarn').innerHTML=(!socF&&na.length)?`<div style="background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.25);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem;font-size:.76rem;color:var(--danger);">⚠️ ${na.length} employé(s) sans société : ils seront dans une feuille « Non affectés ». Choisissez Total ou Sodigaz dans l'onglet <strong>Employés</strong>.</div>`:'';
   document.getElementById('xstats').innerHTML=`
     <div class="ps"><div class="psv">${list.length}</div><div class="psl">Employés</div></div>
-    <div class="ps"><div class="psv" style="color:var(--success)">${totP}</div><div class="psl">Présences (P)</div></div>
+    <div class="ps"><div class="psv" style="color:var(--success)">${totP}</div><div class="psl">Jours présents (P)</div></div>
     <div class="ps"><div class="psv" style="color:var(--mission)">${totM}</div><div class="psl">Missions (M)</div></div>
     <div class="ps"><div class="psv" style="color:var(--accent);font-size:1.1rem">${totPrime.toLocaleString('fr-FR')}</div><div class="psl">Total Primes (F)</div></div>`;
-  document.getElementById('xbody').innerHTML=list.map(e=>`<tr>
-    <td style="font-weight:600">${e.nom}</td><td style="color:var(--accent2);font-size:.68rem">${e.id}</td>
-    <td style="color:var(--accent);font-size:.7rem">${e.carte||'—'}</td><td style="color:var(--muted)">${e.soc}</td>
-    <td><span style="background:rgba(0,196,140,.12);color:var(--success);padding:2px 7px;border-radius:4px;font-size:.62rem;border:1px solid rgba(0,196,140,.25);">✅ ${e.presences}</span></td>
-    <td><span style="background:rgba(230,160,32,.12);color:var(--mission);padding:2px 7px;border-radius:4px;font-size:.62rem;border:1px solid rgba(230,160,32,.25);">🚗 ${e.missions}</span></td>
-    <td style="font-weight:700;color:var(--accent)">${e.prime.toLocaleString('fr-FR')} F</td>
-  </tr>`).join('');
+  document.getElementById('xbody').innerHTML=list.map(x=>`<tr>
+    <td style="font-weight:600">${x.e.nom}</td><td style="color:var(--accent2);font-size:.68rem">${x.e.id}</td>
+    <td style="color:var(--accent);font-size:.7rem">${x.e.carte||'—'}</td><td style="color:var(--muted)">${x.soc}</td>
+    <td><span style="background:rgba(0,196,140,.12);color:var(--success);padding:2px 7px;border-radius:4px;font-size:.62rem;border:1px solid rgba(0,196,140,.25);">✅ ${x.p}</span></td>
+    <td><span style="background:rgba(230,160,32,.12);color:var(--mission);padding:2px 7px;border-radius:4px;font-size:.62rem;border:1px solid rgba(230,160,32,.25);">🚗 ${x.m}</span></td>
+    <td style="font-weight:700;color:var(--accent)">${x.prime.toLocaleString('fr-FR')} F</td></tr>`).join('');
   document.getElementById('xpreview-card').style.display='block';
   document.getElementById('exp-btn').disabled=!list.length;
-  window._xdata={list,filtered,from,to,fromD,toD};
+  window._xdata={groups,getStatus,from,to};
 }
 
-function doExport(){
+async function doExport(){
   if(!window._xdata)return;
+  if(typeof ExcelJS==='undefined'){toast('Bibliothèque Excel non chargée','Vérifiez la connexion puis rechargez la page','err');return;}
   const btn=document.getElementById('exp-btn');btn.disabled=true;btn.textContent='⏳ Génération...';
   try{
-    const{list,filtered,from,to,fromD,toD}=window._xdata;
-    const type=document.getElementById('xtype').value;
-    const wb=XLSX.utils.book_new();
-    if(type==='both'||type==='pointage')buildSheetPointage(wb,list,filtered,from,to,fromD,toD);
-    if(type==='both'||type==='missions')buildSheetMissions(wb,list,from,to);
+    const{groups,getStatus,from,to}=window._xdata;
+    const wb=buildCopayWorkbook(ExcelJS,{from,to,groups,getStatus});
+    const buf=await wb.xlsx.writeBuffer();
     const fn=`COPAY_Pointage_${frDate(from).replace(/\//g,'-')}_au_${frDate(to).replace(/\//g,'-')}.xlsx`;
-    XLSX.writeFile(wb,fn);
-    toast('✅ Fichier téléchargé !',fn);
-  }catch(e){console.error(e);toast('Erreur','','err');}
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download=fn;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+    toast('✅ Fichier téléchargé !',fn);try{localStorage.setItem('exp_'+from,'1');}catch(e){}renderExportReminder();
+  }catch(e){console.error(e);toast('Erreur lors de la génération','','err');}
   btn.textContent='⬇️ Télécharger Excel (avec couleurs)';btn.disabled=false;
 }
 
-// Styles XLSX
-const S={
-  hdr:  {font:{bold:true,color:{rgb:'FFFFFF'},sz:10,name:'Arial'},fill:{fgColor:{rgb:'1F4E79'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}}},
-  title:{font:{bold:true,color:{rgb:'FFFFFF'},sz:13,name:'Arial'},fill:{fgColor:{rgb:'1F4E79'}},alignment:{horizontal:'center',vertical:'center'}},
-  bareme:{font:{bold:true,color:{rgb:'7F6000'},sz:8,name:'Arial'},fill:{fgColor:{rgb:'FFF2CC'}},alignment:{horizontal:'left',wrapText:true}},
-  P:    {font:{bold:true,color:{rgb:'375623'},sz:10,name:'Arial'},fill:{fgColor:{rgb:'C6EFCE'}},alignment:{horizontal:'center'}},
-  M:    {font:{bold:true,color:{rgb:'7F6000'},sz:10,name:'Arial'},fill:{fgColor:{rgb:'FFEB9C'}},alignment:{horizontal:'center'}},
-  A:    {font:{bold:true,color:{rgb:'9C0006'},sz:10,name:'Arial'},fill:{fgColor:{rgb:'FFC7CE'}},alignment:{horizontal:'center'}},
-  X:    {font:{color:{rgb:'808080'},sz:10,name:'Arial'},fill:{fgColor:{rgb:'F2F2F2'}},alignment:{horizontal:'center'}},
-  tot:  {font:{bold:true,color:{rgb:'375623'},sz:10,name:'Arial'},fill:{fgColor:{rgb:'E2EFDA'}},alignment:{horizontal:'center'}},
-  prime:{font:{bold:true,color:{rgb:'375623'},sz:10,name:'Arial'},fill:{fgColor:{rgb:'D9EAD3'}},alignment:{horizontal:'center'}},
-  totRow:{font:{bold:true,color:{rgb:'FFFFFF'},sz:11,name:'Arial'},fill:{fgColor:{rgb:'1F4E79'}},alignment:{horizontal:'center'}},
-  rowT: {font:{sz:10,name:'Arial'},fill:{fgColor:{rgb:'D6E4F7'}},alignment:{horizontal:'center'}},
-  rowS: {font:{sz:10,name:'Arial'},fill:{fgColor:{rgb:'D9F7D9'}},alignment:{horizontal:'center'}},
-  rowTa:{font:{sz:10,name:'Arial'},fill:{fgColor:{rgb:'EBF3FB'}},alignment:{horizontal:'center'}},
-  rowSa:{font:{sz:10,name:'Arial'},fill:{fgColor:{rgb:'EAF7EA'}},alignment:{horizontal:'center'}},
-  plain:{font:{sz:10,name:'Arial'},alignment:{horizontal:'left'}},
-};
+// ═══ COPAY — Générateur Excel (ExcelJS) : mêmes feuilles pour Total et Sodigaz ═══
+const COPAY_BAREME=[[0,0,0],[1,2,500],[3,3,1000],[4,5,1500],[6,6,2000],[7,8,2500],[9,9,3000],[10,11,3500],[12,12,4000],[13,14,4500],[15,15,5000],[16,17,5500],[18,18,6000],[19,20,6500],[21,21,7000],[22,23,7500],[24,999,8000]];
+function copayPrime(n){for(const[a,b,p]of COPAY_BAREME)if(n>=a&&n<=b)return p;return 8000;}
+function copayPrimeFormula(ref){
+  // IF imbriqués générés depuis le barème (mêmes paliers que l'exemplaire)
+  const t=COPAY_BAREME;let f=String(t[t.length-1][2]);
+  for(let i=t.length-2;i>=0;i--){const[a,b,p]=t[i];f=`IF(${ref}${a===b?'='+a:'<='+b},${p},${f})`;}
+  return f;
+}
+function copayCol(n){let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;}
+const COPAY_MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 
-function sc(ws,ref,style){if(!ws[ref])return;ws[ref].s=style;}
-
-function buildSheetPointage(wb,list,filteredLogs,from,to,fromD,toD){
+function buildCopayWorkbook(ExcelJS,opts){
+  const{from,to,groups,getStatus}=opts;           // from/to : 'YYYY-MM-DD'
+  const fromD=new Date(from+'T00:00:00'),toD=new Date(to+'T00:00:00');
   const dates=[];for(let d=new Date(fromD);d<=toD;d.setDate(d.getDate()+1))dates.push(new Date(d));
-  const NCOLS=6+dates.length+4;
+  const N=dates.length,C0=4,CL=C0+N-1;               // jours : D … (D+N-1)
+  const cTot=CL+1,cMis=CL+2,cPri=CL+3,cObs=CL+4,NC=cObs;
+  const L1=copayCol(C0),L2=copayCol(CL);
+  const fmtFR=d=>`${d.getDate()} ${COPAY_MOIS[d.getMonth()]} ${d.getFullYear()}`;
+  const thin={style:'thin',color:{argb:'FF000000'}},BORD={top:thin,left:thin,bottom:thin,right:thin};
+  const fill=hex=>({type:'pattern',pattern:'solid',fgColor:{argb:'FF'+hex}});
+  const F=(o={})=>Object.assign({name:'Arial',size:10},o);
+  const PAL={
+    Total:{a:'D6E4F7',b:'EBF3FB'},Sodigaz:{a:'D9F7D9',b:'EAF7EA'},'Non affectés':{a:'E7E6E6',b:'F5F5F5'}
+  };
+  const BAR='BARÈME : ≤2→500 F | 3→1000 F | 4-5→1500 F | 6→2000 F | 7-8→2500 F | 9→3000 F | 10-11→3500 F | 12→4000 F | 13-14→4500 F | 15→5000 F | 16-17→5500 F | 18→6000 F | 19-20→6500 F | 21→7000 F | 22-23→7500 F | 24→8000 F';
+  const wb=new ExcelJS.Workbook();wb.creator='COPAY Services — PointQR';
+  const rowsInfo=[];                                  // pour le Récap : {grp,row,emp,num}
+  const put=(ws,r,c,v,st={})=>{const x=ws.getCell(r,c);x.value=v;if(st.font)x.font=st.font;if(st.fill)x.fill=st.fill;x.alignment=Object.assign({horizontal:'center',vertical:'middle',wrapText:true},st.al||{});x.border=BORD;return x;};
 
-  const aoa=[];
-  aoa.push(['COPAY SERVICES — FEUILLE DE POINTAGE']);
-  aoa.push([`Période : ${frDate(from)} au ${frDate(to)}`]);
-  aoa.push(['BARÈME : ≤2→500F | 3→1000F | 4-5→1500F | 6→2000F | 7-8→2500F | 9→3000F | 10-11→3500F | 12→4000F | 13-14→4500F | 15→5000F | 16-17→5500F | 18→6000F | 19-20→6500F | 21→7000F | 22-23→7500F | 24→8000F']);
-  aoa.push([]);
-  const hdrs=['N°','ID Firebase','Carte','Noms & Prénoms','Poste','Société'];
-  dates.forEach(d=>hdrs.push(`${d.getDate()}\n${['Di','Lu','Ma','Me','Je','Ve','Sa'][d.getDay()]}`));
-  hdrs.push('Total\nJours','Nb\nMissions','Prime\n(F CFA)','Observations');
-  aoa.push(hdrs);
-
-  list.forEach((emp,idx)=>{
-    const row=[idx+1,emp.id,emp.carte,emp.nom,emp.poste,emp.soc];
-    dates.forEach(d=>{
-      const iso=fmtDate(d),dl=filteredLogs.filter(l=>l.empId===emp.id&&l.date===frDate(iso));
-      if(d.getDay()===0)row.push('X');
-      else if(!dl.length)row.push('A');
-      else{const hasMis=dl.some(l=>l.type==='arrivee'&&l.mission),hasArr=dl.some(l=>l.type==='arrivee');row.push(hasMis?'M':hasArr?'P':'A');}
+  groups.forEach(g=>{
+    const pal=PAL[g.name]||PAL['Non affectés'];
+    const ws=wb.addWorksheet(g.name,{views:[{state:'frozen',xSplit:3,ySplit:4}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+    ws.getColumn(1).width=5;ws.getColumn(2).width=13;ws.getColumn(3).width=24;
+    for(let c=C0;c<=CL;c++)ws.getColumn(c).width=4.4;
+    ws.getColumn(cTot).width=8;ws.getColumn(cMis).width=8;ws.getColumn(cPri).width=12;ws.getColumn(cObs).width=18;
+    // 1-3 : titre, période, barème
+    ws.mergeCells(1,1,1,NC);put(ws,1,1,`COPAY SERVICES — FEUILLE DE POINTAGE  (${g.name.toUpperCase()})`,{font:F({bold:true,size:13,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')});ws.getRow(1).height=27.75;
+    ws.mergeCells(2,1,2,NC);put(ws,2,1,`Période : du ${fmtFR(fromD)} au ${fmtFR(toD)}`,{font:F({bold:true,color:{argb:'FFFFFFFF'}}),fill:fill('2E75B6')});ws.getRow(2).height=18;
+    ws.mergeCells(3,1,3,NC);put(ws,3,1,BAR,{font:F({bold:true,size:8,color:{argb:'FF7F6000'}}),fill:fill('FFF2CC')});ws.getRow(3).height=19.5;
+    // 4 : en-têtes
+    const H=(c,v,sz=9,bg='1F4E79')=>put(ws,4,c,v,{font:F({bold:true,size:sz,color:{argb:'FFFFFFFF'}}),fill:fill(bg)});
+    H(1,'N°');H(2,'Plaque\nVoiture');H(3,'Noms & Prénoms');
+    dates.forEach((d,i)=>H(C0+i,String(d.getDate()),8,d.getDay()===0?'C55A11':'1F4E79'));
+    H(cTot,'Total\nJours');H(cMis,'Nb\nMiss.');H(cPri,'Prime\n(F)');H(cObs,'Observations');ws.getRow(4).height=31.5;
+    // données
+    const r0=5;let sumJ=0,sumM=0,sumP=0;
+    g.emps.forEach((e,i)=>{
+      const r=r0+i,bg=fill(i%2===0?pal.a:pal.b);
+      put(ws,r,1,i+1,{font:F(),fill:bg});put(ws,r,2,e.plaque||'',{font:F({size:9}),fill:bg});put(ws,r,3,e.nom||'',{font:F({bold:true}),fill:bg,al:{horizontal:'left'}});
+      let nP=0,nM=0;
+      dates.forEach((d,k)=>{const s=getStatus(e,d);if(s==='P')nP++;if(s==='M')nM++;put(ws,r,C0+k,s,{font:F(),fill:bg});});
+      const rng=`${L1}${r}:${L2}${r}`,tj=nP+nM,pr=copayPrime(nM);sumJ+=tj;sumM+=nM;sumP+=pr;
+      put(ws,r,cTot,{formula:`COUNTIF(${rng},"P")+COUNTIF(${rng},"M")`,result:tj},{font:F({bold:true}),fill:fill('E2EFDA')});
+      put(ws,r,cMis,{formula:`COUNTIF(${rng},"M")`,result:nM},{font:F({bold:true}),fill:fill('E2EFDA')});
+      put(ws,r,cPri,{formula:copayPrimeFormula(`${copayCol(cMis)}${r}`),result:pr},{font:F({bold:true,color:{argb:'FF375623'}}),fill:fill('E2EFDA')});
+      put(ws,r,cObs,'',{font:F(),fill:bg,al:{horizontal:'left'}});
+      ws.getRow(r).height=19.5;rowsInfo.push({grp:g.name,row:r,emp:e,nP,nM});
     });
-    row.push(emp.presences+emp.missions,emp.missions,emp.prime,'');
-    aoa.push(row);
-  });
-
-  const totRow=['','','','TOTAUX','',''];
-  dates.forEach(()=>totRow.push(''));
-  totRow.push(list.reduce((s,e)=>s+e.presences+e.missions,0),list.reduce((s,e)=>s+e.missions,0),list.reduce((s,e)=>s+e.prime,0),'');
-  aoa.push(totRow);
-
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-
-  // Largeurs
-  const cols=[{wch:5},{wch:12},{wch:12},{wch:24},{wch:16},{wch:12}];
-  dates.forEach(()=>cols.push({wch:5}));cols.push({wch:9},{wch:9},{wch:14},{wch:18});ws['!cols']=cols;
-
-  // Fusion titre
-  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:NCOLS-1}},{s:{r:1,c:0},e:{r:1,c:NCOLS-1}},{s:{r:2,c:0},e:{r:2,c:NCOLS-1}}];
-
-  // Appliquer styles
-  const getCellRef=(r,c)=>XLSX.utils.encode_cell({r,c});
-  sc(ws,getCellRef(0,0),S.title);
-  sc(ws,getCellRef(1,0),{...S.title,fill:{fgColor:{rgb:'2E75B6'}}});
-  sc(ws,getCellRef(2,0),S.bareme);
-  // En-têtes
-  for(let c=0;c<NCOLS;c++)sc(ws,getCellRef(4,c),S.hdr);
-  // Données
-  list.forEach((emp,idx)=>{
-    const r=5+idx;
-    const isSod=(emp.soc==='Sodigaz');
-    const base=idx%2===0?(isSod?S.rowS:S.rowT):(isSod?S.rowSa:S.rowTa);
-    for(let c=0;c<6;c++)sc(ws,getCellRef(r,c),{...base,alignment:{horizontal:c===3?'left':'center'}});
-    dates.forEach((d,di)=>{
-      const cellRef=getCellRef(r,6+di);
-      const val=ws[cellRef]?.v;
-      const sty=val==='P'?S.P:val==='M'?S.M:val==='A'?S.A:val==='X'?S.X:base;
-      sc(ws,cellRef,sty);
-    });
-    sc(ws,getCellRef(r,6+dates.length),S.tot);
-    sc(ws,getCellRef(r,6+dates.length+1),S.M);
-    sc(ws,getCellRef(r,6+dates.length+2),S.prime);
-    sc(ws,getCellRef(r,6+dates.length+3),base);
-  });
-  // Totaux
-  const tr=5+list.length;
-  for(let c=0;c<NCOLS;c++)sc(ws,getCellRef(tr,c),S.totRow);
-
-  XLSX.utils.book_append_sheet(wb,ws,'Pointage Détaillé');
-}
-
-function buildSheetMissions(wb,list,from,to){
-  const aoa=[];
-  aoa.push(['COPAY SERVICES — RÉCAP MISSIONS & PRIMES']);
-  aoa.push([`Période : ${frDate(from)} au ${frDate(to)}`]);
-  aoa.push(['BARÈME : ≤2→500F | 3→1000F | 4-5→1500F | 6→2000F | 7-8→2500F | 9→3000F | 10-11→3500F | 12→4000F | 13-14→4500F | 15→5000F | 16-17→5500F | 18→6000F | 19-20→6500F | 21→7000F | 22-23→7500F | 24→8000F']);
-  aoa.push([]);
-  aoa.push(['N°','ID Firebase','Carte','Noms & Prénoms','Poste','Société','Plaque','Présences (P)','Missions (M)','Total Jours','Prime (F CFA)','Observations']);
-  list.forEach((e,i)=>aoa.push([i+1,e.id,e.carte,e.nom,e.poste,e.soc,e.plaque,e.presences,e.missions,e.presences+e.missions,e.prime,'']));
-  aoa.push(['','','','TOTAUX','','','',list.reduce((s,e)=>s+e.presences,0),list.reduce((s,e)=>s+e.missions,0),list.reduce((s,e)=>s+e.presences+e.missions,0),list.reduce((s,e)=>s+e.prime,0),'']);
-
-  ['Total','Sodigaz'].forEach(soc=>{
-    const sub=list.filter(e=>e.soc===soc);if(!sub.length)return;
-    aoa.push([],[`── ${soc.toUpperCase()} ──`,`${sub.length} employés`,'','','','',`P: ${sub.reduce((s,e)=>s+e.presences,0)}`,`M: ${sub.reduce((s,e)=>s+e.missions,0)}`,'',`${sub.reduce((s,e)=>s+e.prime,0)} F CFA`,'']);
-    sub.forEach((e,i)=>aoa.push([i+1,e.id,e.carte,e.nom,e.poste,soc,e.plaque,e.presences,e.missions,e.presences+e.missions,e.prime,'']));
-  });
-
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:5},{wch:12},{wch:12},{wch:24},{wch:16},{wch:12},{wch:14},{wch:12},{wch:12},{wch:10},{wch:14},{wch:18}];
-  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:11}},{s:{r:1,c:0},e:{r:1,c:11}},{s:{r:2,c:0},e:{r:2,c:11}}];
-
-  const getCR=(r,c)=>XLSX.utils.encode_cell({r,c});
-  sc(ws,getCR(0,0),S.title);
-  sc(ws,getCR(1,0),{...S.title,fill:{fgColor:{rgb:'2E75B6'}}});
-  sc(ws,getCR(2,0),S.bareme);
-  for(let c=0;c<12;c++)sc(ws,getCR(4,c),S.hdr);
-  list.forEach((emp,idx)=>{
-    const r=5+idx,isSod=(emp.soc==='Sodigaz'),base=idx%2===0?(isSod?S.rowS:S.rowT):(isSod?S.rowSa:S.rowTa);
-    for(let c=0;c<12;c++){
-      const ref=getCR(r,c);
-      if(c===7)sc(ws,ref,S.P);
-      else if(c===8)sc(ws,ref,S.M);
-      else if(c===10)sc(ws,ref,S.prime);
-      else sc(ws,ref,{...base,alignment:{horizontal:c===3?'left':'center'}});
+    const rl=r0+g.emps.length-1,rt=rl+1;
+    // conditionnel : P / M / A / X (suit les corrections manuelles)
+    if(g.emps.length){
+      const rules=[['P','C6EFCE','375623'],['M','FFEB9C','7F6000'],['A','FFC7CE','9C0006'],['X','D9D9D9','595959']].map(([v,bg,fc])=>({type:'cellIs',operator:'equal',formulae:[`"${v}"`],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FF'+bg}},font:{bold:true,color:{argb:'FF'+fc}}}}));
+      ws.addConditionalFormatting({ref:`${L1}${r0}:${L2}${rl}`,rules});
     }
+    // TOTAUX
+    ws.mergeCells(rt,1,rt,3);put(ws,rt,1,'TOTAUX',{font:F({bold:true,size:11,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')});
+    for(let c=C0;c<=CL;c++)put(ws,rt,c,'',{fill:fill('1F4E79')});
+    const sumF=c=>g.emps.length?`SUM(${copayCol(c)}${r0}:${copayCol(c)}${rl})`:'0';
+    put(ws,rt,cTot,{formula:sumF(cTot),result:sumJ},{font:F({bold:true,color:{argb:'FF375623'}}),fill:fill('E2EFDA')});
+    put(ws,rt,cMis,{formula:sumF(cMis),result:sumM},{font:F({bold:true,color:{argb:'FF375623'}}),fill:fill('E2EFDA')});
+    put(ws,rt,cPri,{formula:sumF(cPri),result:sumP},{font:F({bold:true,color:{argb:'FF375623'}}),fill:fill('E2EFDA')});
+    put(ws,rt,cObs,'',{fill:fill('1F4E79')});ws.getRow(rt).height=21.75;
+    // légende + signature
+    const rg=rt+2;ws.mergeCells(rg,1,rg,NC);put(ws,rg,1,'LÉGENDE :  P = Présent   M = Mission   A = Absent   C = Congé   X = Dimanche/Repos   ← saisir dans chaque case du jour',{font:F({bold:true,size:9,color:{argb:'FF7F6000'}}),fill:fill('FFF2CC')});
+    const rs=rg+2;ws.mergeCells(rs,1,rs,14);const s=ws.getCell(rs,1);s.value='Signature responsable : ________________________________';s.font=F({bold:true});s.alignment={horizontal:'center'};
   });
-  const tr=5+list.length;
-  for(let c=0;c<12;c++)sc(ws,getCR(tr,c),S.totRow);
-  XLSX.utils.book_append_sheet(wb,ws,'Récap Missions & Primes');
+
+  // ── Récap Mensuel : 100 % formules reliées aux feuilles de pointage ──
+  const wr=wb.addWorksheet('Récap Mensuel',{views:[{state:'frozen',ySplit:4}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  [5,11,13,26,10,10,10,10,10,10,14,22].forEach((w,i)=>wr.getColumn(i+1).width=w);
+  wr.mergeCells(1,1,1,12);put(wr,1,1,'COPAY SERVICES — RÉCAPITULATIF MENSUEL  (16 → 15)',{font:F({bold:true,size:13,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')});wr.getRow(1).height=27.75;
+  wr.mergeCells(2,1,2,12);put(wr,2,1,BAR+'  (F CFA)',{font:F({bold:true,size:8,color:{argb:'FF7F6000'}}),fill:fill('FFF2CC')});wr.getRow(2).height=19.5;
+  wr.mergeCells(3,1,3,12);put(wr,3,1,`Période : du ${fmtFR(fromD)} au ${fmtFR(toD)}`,{font:F({bold:true,color:{argb:'FFFFFFFF'}}),fill:fill('2E75B6')});wr.getRow(3).height=18;
+  const weeks=[0,1,2,3,4].map(k=>[k*7,Math.min(k*7+6,N-1)]);
+  const wh=['N°','Société','Plaque','Noms & Prénoms',...weeks.map(([a,b],k)=>a>N-1?`Sem.${k+1}\n(—)`:`Sem.${k+1}\n(${dates[a].getDate()}-${dates[b].getDate()})`),'Total\nMissions','Prime\nTotale (F)','Observations'];
+  wh.forEach((v,i)=>put(wr,4,i+1,v,{font:F({bold:true,size:9,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')}));wr.getRow(4).height=31.5;
+  let rr=5,tM=0,tP=0;const first=rr;
+  rowsInfo.forEach((ri,i)=>{
+    const pal=PAL[ri.grp]||PAL['Non affectés'],bg=fill(i%2===0?pal.a:pal.b),sh=`'${ri.grp}'`;
+    put(wr,rr,1,i+1,{font:F(),fill:bg});put(wr,rr,2,ri.grp,{font:F({bold:true}),fill:bg});put(wr,rr,3,ri.emp.plaque||'',{font:F({size:9}),fill:bg});put(wr,rr,4,ri.emp.nom||'',{font:F({bold:true}),fill:bg,al:{horizontal:'left'}});
+    weeks.forEach(([a,b],k)=>{
+      if(a>N-1){put(wr,rr,5+k,0,{font:F(),fill:bg});return;}
+      let cnt=0;for(let d=a;d<=b;d++)if(opts.getStatus(ri.emp,dates[d])==='M')cnt++;
+      put(wr,rr,5+k,{formula:`COUNTIF(${sh}!${copayCol(C0+a)}${ri.row}:${copayCol(C0+b)}${ri.row},"M")`,result:cnt},{font:F(),fill:bg});
+    });
+    put(wr,rr,10,{formula:`SUM(E${rr}:I${rr})`,result:ri.nM},{font:F({bold:true}),fill:fill('FFF2CC')});
+    put(wr,rr,11,{formula:copayPrimeFormula(`J${rr}`),result:copayPrime(ri.nM)},{font:F({bold:true,color:{argb:'FF375623'}}),fill:fill('E2EFDA')});
+    put(wr,rr,12,'',{font:F(),fill:bg,al:{horizontal:'left'}});wr.getRow(rr).height=19.5;
+    tM+=ri.nM;tP+=copayPrime(ri.nM);rr++;
+  });
+  wr.mergeCells(rr,1,rr,4);put(wr,rr,1,'TOTAUX GÉNÉRAUX',{font:F({bold:true,size:11,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')});
+  for(let c=5;c<=11;c++){const L=copayCol(c);put(wr,rr,c,rowsInfo.length?{formula:`SUM(${L}${first}:${L}${rr-1})`,result:c===10?tM:c===11?tP:undefined}:0,{font:F({bold:true,color:{argb:'FF375623'}}),fill:fill(c>=10?'E2EFDA':'FFF2CC')});}
+  put(wr,rr,12,'',{fill:fill('1F4E79')});wr.getRow(rr).height=21.75;
+
+  // ── Base de Données ──
+  const wd=wb.addWorksheet('Base de Données');
+  [6,12,16,26,24,10,14,16].forEach((w,i)=>wd.getColumn(i+1).width=w);
+  wd.mergeCells(1,1,1,8);put(wd,1,1,'COPAY SERVICES — BASE DE DONNÉES EMPLOYÉS',{font:F({bold:true,size:13,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')});wd.getRow(1).height=27.75;
+  ['N°','Société','Plaque Voiture','Noms & Prénoms','Poste / Remarques','Statut','ID (badge)','N° Carte'].forEach((v,i)=>put(wd,2,i+1,v,{font:F({bold:true,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')}));
+  let k=0;groups.forEach(g=>g.emps.forEach(e=>{const r=3+k,pal=PAL[g.name]||PAL['Non affectés'],bg=fill(k%2===0?pal.a:pal.b);
+    [k+1,g.name,e.plaque||'',e.nom||'',e.poste||'','Actif',e.id||'',e.carte||''].forEach((v,i)=>put(wd,r,i+1,v,{font:F({bold:i===3}),fill:bg,al:i===3||i===4?{horizontal:'left'}:{}}));k++;}));
+  wd.mergeCells(3+k,1,3+k,3);put(wd,3+k,1,`TOTAL EMPLOYÉS : ${k}`,{font:F({bold:true,color:{argb:'FFFFFFFF'}}),fill:fill('1F4E79')});
+  return wb;
 }
+
 </script>
 </body>
 </html>
