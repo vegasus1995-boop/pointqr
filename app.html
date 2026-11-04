@@ -9,6 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PointQR">
 <link rel="manifest" href="manifest.json">
+<script>(function(){var p=new URLSearchParams(location.search).get('role'),s=null;try{s=localStorage.getItem('copay_role');}catch(e){}
+var r=(p==='sec'||p==='liv')?p:((s==='sec'||s==='liv')?s:null),l=document.querySelector('link[rel="manifest"]');if(l&&r)l.href='manifest_'+r+'.json';})();</script>
 <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').then(()=>console.log('SW OK')).catch(e=>console.log('SW err',e));}</script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -617,7 +619,7 @@ function showApp(role){
   hdr.style.display='flex';
   document.getElementById('ah-ico').textContent=cfg.ico;
   document.getElementById('ah-title').textContent=cfg.title;
-  document.getElementById('ah-sub').textContent=cfg.sub;
+  document.getElementById('ah-sub').textContent=cfg.sub+' · v5';
   const backBtn=document.getElementById('back-role-btn');
   backBtn.className='back-role '+(cfg.backClass||'');
   if(FIXED_ROLE)backBtn.style.display='none';

@@ -1,12 +1,14 @@
 {
-  "name": "PointQR - Système de Pointage",
+  "name": "COPAY Services — PointQR",
   "short_name": "PointQR",
-  "description": "Système de pointage par QR code",
-  "start_url": "/pointqr/dashboard.html",
+  "description": "Système de pointage COPAY Services",
+  "id": "/pointqr/app.html",
+  "start_url": "/pointqr/app.html",
+  "scope": "/pointqr/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#00e5b0",
   "orientation": "portrait",
+  "background_color": "#0a0a0f",
+  "theme_color": "#c8861a",
   "icons": [
     {
       "src": "icon-192.png",
