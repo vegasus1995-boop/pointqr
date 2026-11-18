@@ -1,7 +1,7 @@
-// COPAY PointQR — Service Worker v5
+// COPAY PointQR — Service Worker v6
 // Pages (.html) : réseau d'abord (mises à jour reçues), cache en secours (hors ligne)
 // Bibliothèques : cache d'abord (rapide + hors ligne)
-const CACHE_NAME = 'copay-pointqr-v5';
+const CACHE_NAME = 'copay-pointqr-v6';
 const ASSETS = [
   '/pointqr/app.html',
   '/pointqr/dashboard_2.html',
@@ -10,6 +10,7 @@ const ASSETS = [
   '/pointqr/manifest.json',
   '/pointqr/manifest_sec.json',
   '/pointqr/manifest_liv.json',
+  '/pointqr/manifest_bb.json',
   '/pointqr/icon-192.png',
   '/pointqr/icon-512.png',
   '/pointqr/logo.jpg',
