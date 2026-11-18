@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="PointQR">
 <link rel="manifest" href="manifest.json">
 <script>(function(){var p=new URLSearchParams(location.search).get('role'),s=null;try{s=localStorage.getItem('copay_role');}catch(e){}
-var r=(p==='sec'||p==='liv')?p:((s==='sec'||s==='liv')?s:null),l=document.querySelector('link[rel="manifest"]');if(l&&r)l.href='manifest_'+r+'.json';})();</script>
+var r=(p==='sec'||p==='liv'||p==='bb')?p:((s==='sec'||s==='liv'||s==='bb')?s:null),l=document.querySelector('link[rel="manifest"]');if(l&&r)l.href='manifest_'+r+'.json';})();</script>
 <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').then(()=>console.log('SW OK')).catch(e=>console.log('SW err',e));}</script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -256,6 +256,14 @@ body{display:flex;flex-direction:column;}
       </div>
       <div class="rc-arr">›</div>
     </div>
+    <div class="role-card rc-liv" onclick="setRole('bb')">
+      <div class="rc-ico">🍺</div>
+      <div class="rc-info">
+        <div class="rc-name" style="color:var(--accent);">Brasserie BB</div>
+        <div class="rc-desc">Mon arrivée / ma sortie avec mon téléphone</div>
+      </div>
+      <div class="rc-arr">›</div>
+    </div>
     <div class="role-card rc-adm" onclick="setRole('adm')">
       <div class="rc-ico">🖥️</div>
       <div class="rc-info">
@@ -326,7 +334,7 @@ body{display:flex;flex-direction:column;}
       <div class="rgrid">
         <div class="rchip"><div class="rcl">Date</div><div class="rcv" id="sec-rdate">—</div></div>
         <div class="rchip"><div class="rcl">Heure</div><div class="rcv" id="sec-rtime">—</div></div>
-        <div class="rchip"><div class="rcl">Type</div><div class="rcv">🏢 Bureau</div></div>
+        <div class="rchip"><div class="rcl">Type</div><div class="rcv" id="sec-rtype">🏢 Bureau</div></div>
         <div class="rchip"><div class="rcl">Pointage</div><div class="rcv" id="sec-rpt">—</div></div>
       </div>
       <div class="rbtns">
@@ -450,18 +458,18 @@ let employees=[],logs=[],gpsData=null,detCity=null,fbOk=false;
 let secPendId=null,livPendId=null,miniMap=null,liveMap=null;
 let secScanner=null,livScanner=null,secScanOn=false,livScanOn=false;
 let lastScan='',lastScanT=0;
-let currentRole=null;
+let currentRole=null,BB_MODE=false;
 const _qr=new URLSearchParams(location.search).get('role');
 let _saved=null;try{_saved=localStorage.getItem('copay_role');}catch(e){}
-const FIXED_ROLE=['sec','liv','adm'].includes(_qr)?_qr:(['sec','liv'].includes(_saved)?_saved:null);
-if(_qr==='sec'||_qr==='liv'){try{localStorage.setItem('copay_role',_qr);}catch(e){}}   // l'icône installée rouvre le même rôle
+const FIXED_ROLE=['sec','liv','adm','bb'].includes(_qr)?_qr:(['sec','liv','bb'].includes(_saved)?_saved:null);
+if(_qr==='sec'||_qr==='liv'||_qr==='bb'){try{localStorage.setItem('copay_role',_qr);}catch(e){}}   // l'icône installée rouvre le même rôle
 const OFFLINE_KEY_SEC='copay_sec_offline';
 const OFFLINE_KEY_LIV='copay_liv_offline';
 
 // ══════════════════════════════════════════════════════════════════
 // UTILS
 // ══════════════════════════════════════════════════════════════════
-function socOf(e){const d=((e&&e.dept)||'').toLowerCase();return d.includes('sodigaz')?'Sodigaz':d.includes('total')?'Total':'';}
+function socOf(e){const d=((e&&e.dept)||'').toLowerCase();return d.includes('sodigaz')?'Sodigaz':d.includes('total')?'Total':(d.includes('brasserie')||d.trim()==='bb')?'Brasserie BB':'';}
 function ini(n){return(n||'?').split(' ').map(w=>w[0]||'').join('').substring(0,2).toUpperCase();}
 function nowDT(){const d=new Date();return{date:d.toLocaleDateString('fr-FR'),time:d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),ts:d.getTime()};}
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>t.classList.remove('show'),3200);}
@@ -588,6 +596,11 @@ const ROLE_CONFIG={
       {id:'liv-histo',label:'🚗 Mes missions'}
     ]
   },
+  bb:{
+    ico:'🍺',title:'Brasserie BB',sub:'Arrivée / Sortie',
+    headerClass:'liv',backClass:'',
+    tabs:[{id:'sec-scan',label:'📷 Mon QR'},{id:'sec-manual',label:'⌨️ Mon ID'},{id:'sec-presences',label:'👥 Équipe'},{id:'sec-histo',label:'📋 Pointages'}]
+  },
   adm:{
     ico:'🖥️',title:'Administrateur',sub:'Dashboard complet',
     headerClass:'adm',backClass:'dark',
@@ -612,6 +625,7 @@ function setRole(role){
 
 function showApp(role){
   document.getElementById('login-screen').classList.remove('show');
+  BB_MODE=(role==='bb');
   const cfg=ROLE_CONFIG[role];
   // Header
   const hdr=document.getElementById('app-header');
@@ -619,7 +633,7 @@ function showApp(role){
   hdr.style.display='flex';
   document.getElementById('ah-ico').textContent=cfg.ico;
   document.getElementById('ah-title').textContent=cfg.title;
-  document.getElementById('ah-sub').textContent=cfg.sub+' · v5';
+  document.getElementById('ah-sub').textContent=cfg.sub+' · v6';
   const backBtn=document.getElementById('back-role-btn');
   backBtn.className='back-role '+(cfg.backClass||'');
   if(FIXED_ROLE)backBtn.style.display='none';
@@ -636,7 +650,7 @@ function showApp(role){
   // Montrer premier pane
   document.getElementById(cfg.tabs[0].id).classList.add('active');
   // Init selon rôle
-  if(role==='sec')initSec();
+  if(role==='sec'||role==='bb')initSec();
   if(role==='liv')initLiv();
   refreshUI();
 }
@@ -656,6 +670,7 @@ function goRoles(){
 }
 
 function switchTab(paneId,btn,role){
+  role=role==='bb'?'sec':role;
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.atab').forEach(t=>t.classList.remove('active'));
   document.getElementById(paneId).classList.add('active');
@@ -734,6 +749,7 @@ function procMan(role){
 function procEmp(empId,role,source){
   const emp=employees.find(e=>e.id===empId);
   if(!emp){toast(`❌ ID "${empId}" introuvable`,'err');return;}
+  if(BB_MODE&&socOf(emp)!=='Brasserie BB'){toast('❌ Cet ID n\'est pas de la Brasserie BB','err');return;}
   const _last=logsToday(empId).slice(-1)[0];
   if(_last&&Date.now()-_last.ts<60000){toast(`⏱ ${emp.nom} déjà pointé il y a ${Math.round((Date.now()-_last.ts)/1000)} s`,'warn');return;}
   if(role==='sec'){
@@ -746,12 +762,13 @@ function procEmp(empId,role,source){
     document.getElementById('sec-rid').textContent=`ID: ${emp.id} · ${source}`;
     document.getElementById('sec-rdate').textContent=d.date;
     document.getElementById('sec-rtime').textContent=d.time;
-    document.getElementById('sec-rpt').textContent=type==='arrivee'?'✅ P — Présent':'🚪 Départ';
+    document.getElementById('sec-rpt').textContent=BB_MODE?(type==='arrivee'?'✅ Arrivée':'🚪 Sortie'):(type==='arrivee'?'✅ P — Présent':'🚪 Départ');
+    document.getElementById('sec-rtype').textContent=BB_MODE?'🍺 Brasserie BB':'🏢 Bureau';
     const ra=document.getElementById('sec-ract');
-    ra.textContent=type==='arrivee'?'▶ ARRIVÉE (P)':'◀ DÉPART bureau';
+    ra.textContent=BB_MODE?(type==='arrivee'?'▶ ARRIVÉE':'◀ SORTIE'):(type==='arrivee'?'▶ ARRIVÉE (P)':'◀ DÉPART bureau');
     ra.className='raction '+(type==='arrivee'?'in':'out');
     const cb=document.getElementById('sec-confbtn');
-    cb.textContent=type==='arrivee'?'✓ Enregistrer Arrivée (P)':'✓ Enregistrer Départ';
+    cb.textContent=BB_MODE?(type==='arrivee'?'✓ Enregistrer mon arrivée':'✓ Enregistrer ma sortie'):(type==='arrivee'?'✓ Enregistrer Arrivée (P)':'✓ Enregistrer Départ');
     cb.style.background=type==='arrivee'?'var(--success)':'var(--accent2)';
     document.getElementById('sec-rcard').className='rcard show ok-sec';
     document.getElementById('sec-rcard').scrollIntoView({behavior:'smooth',block:'center'});
@@ -784,6 +801,7 @@ async function confirmP(role){
   if(role==='sec'){
     const type=getSt(empId)==='present'?'depart':'arrivee';
     log={empId:emp.id,empNom:emp.nom,empPoste:emp.poste||'',empCarte:emp.carte||'',empSociete:socOf(emp),type,mission:false,date:d.date,time:d.time,ts:d.ts,lat:null,lng:null,ville:'— Bureau',scannerBy:'securite'};
+    if(BB_MODE){log.scannerBy='bb';log.ville=detCity||'— Brasserie BB';if(gpsData){log.lat=gpsData.lat;log.lng=gpsData.lng;log.acc=gpsData.acc;}}
   } else {
     log={empId:emp.id,empNom:emp.nom,empPoste:emp.poste||'',empCarte:emp.carte||'',empSociete:socOf(emp),type:'arrivee',mission:true,date:d.date,time:d.time,ts:d.ts,ville:detCity||null,scannerBy:'livreur'};
     if(gpsData){log.lat=gpsData.lat;log.lng=gpsData.lng;log.acc=gpsData.acc;}
@@ -870,18 +888,19 @@ function updateLiveMap(){
 // REFRESH UI
 // ══════════════════════════════════════════════════════════════════
 function refreshUI(){
-  if(currentRole==='sec'){renderPresences();renderHisto('sec');}
+  if(currentRole==='sec'||currentRole==='bb'){renderPresences();renderHisto('sec');}
   if(currentRole==='liv'){renderHisto('liv');}
 }
 
 function renderPresences(){
   const today=new Date().toLocaleDateString('fr-FR');
-  const presents=employees.filter(e=>getSt(e.id)==='present');
-  const missions=employees.filter(e=>getSt(e.id)==='mission');
-  const absents=employees.filter(e=>getSt(e.id)==='absent');
+  const _E=BB_MODE?employees.filter(e=>socOf(e)==='Brasserie BB'):employees.filter(e=>socOf(e)!=='Brasserie BB');
+  const presents=_E.filter(e=>getSt(e.id)==='present');
+  const missions=_E.filter(e=>getSt(e.id)==='mission');
+  const absents=_E.filter(e=>getSt(e.id)==='absent');
   document.getElementById('sec-pcnt').textContent=`${presents.length+missions.length} présent(s)`;
   const el=document.getElementById('sec-plist');
-  if(!employees.length){el.innerHTML='<div class="empty">Aucun employé</div>';return;}
+  if(!_E.length){el.innerHTML='<div class="empty">Aucun employé</div>';return;}
   el.innerHTML=[...presents,...missions,...absents].map(emp=>{
     const st=getSt(emp.id),ll=getLL(emp.id);
     const av=emp.photo?`<div class="pav"><img src="${emp.photo}"></div>`:`<div class="pav">${ini(emp.nom)}</div>`;

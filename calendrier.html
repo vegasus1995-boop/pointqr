@@ -212,7 +212,7 @@ function renderCal(){
   });
 
   // Filtrer employés
-  let empList=employees;
+  let empList=employees.filter(e=>!/brasserie/i.test(e.dept||''));   // la Brasserie BB a son propre rapport d'heures
   if(empFilter)empList=empList.filter(e=>(e.nom||'').toLowerCase().includes(empFilter));
   if(socFilter)empList=empList.filter(e=>(e.dept||'').includes(socFilter));
 
